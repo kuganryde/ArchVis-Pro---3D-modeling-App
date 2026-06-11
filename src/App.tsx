@@ -35,6 +35,7 @@ export default function App() {
   const [viewMode, setViewMode] = useState<'2D' | '3D'>('3D');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<'all' | 'furniture' | 'infrastructure'>('all');
   const [activeAssetTypeFilter, setActiveAssetTypeFilter] = useState<string | 'all'>('all');
+  const [showOccupancyHeatmap, setShowOccupancyHeatmap] = useState(false);
 
   // Interactive help tour state
   const [showTutorial, setShowTutorial] = useState(true);
@@ -182,8 +183,28 @@ export default function App() {
 
   // Dragging event coordinate update
   const handleUpdateAssetPosition = (id: string, x: number, z: number) => {
+    // Find if the coordinates fall within any room boundaries dynamically
+    const containingRoom = rooms.find((room) => {
+      const halfW = room.width / 2;
+      const halfD = room.depth / 2;
+      return (
+        x >= room.x - halfW &&
+        x <= room.x + halfW &&
+        z >= room.z - halfD &&
+        z <= room.z + halfD
+      );
+    });
+
     setAssets((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, position: { ...a.position, x, z } } : a))
+      prev.map((a) =>
+        a.id === id
+          ? {
+              ...a,
+              position: { ...a.position, x, z },
+              assignedRoomId: containingRoom ? containingRoom.id : undefined,
+            }
+          : a
+      )
     );
   };
 
@@ -264,6 +285,26 @@ export default function App() {
               2D Plan
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              const nextState = !showOccupancyHeatmap;
+              setShowOccupancyHeatmap(nextState);
+              if (nextState && viewMode !== '2D') {
+                setViewMode('2D');
+              }
+            }}
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all border flex items-center gap-1.5 cursor-pointer focus:outline-none ${
+              showOccupancyHeatmap
+                ? 'bg-emerald-600 border-emerald-600 text-white font-bold hover:bg-emerald-700 shadow-sm'
+                : 'bg-white/95 border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-50 shadow-sm'
+            }`}
+            title="Toggle colorized room occupancy load heat map overlay"
+          >
+            <Sparkles className={`w-3.5 h-3.5 ${showOccupancyHeatmap ? 'animate-spin' : ''}`} style={{ animationDuration: '4s' }} />
+            <span>Heatmap Overlay</span>
+          </button>
 
           <button
             type="button"
@@ -374,6 +415,7 @@ export default function App() {
             viewMode={viewMode}
             activeCategoryFilter={activeCategoryFilter}
             activeAssetTypeFilter={activeAssetTypeFilter}
+            showOccupancyHeatmap={showOccupancyHeatmap}
           />
         </div>
 

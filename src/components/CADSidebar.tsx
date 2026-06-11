@@ -16,6 +16,86 @@ import {
 } from 'lucide-react';
 import { PlacedAsset, RoomDefinition, ZohoCreatorConfig } from '../types';
 
+function getAssetSize(asset: PlacedAsset): { width: number; depth: number } {
+  const scaleX = asset.scale?.x || 1.0;
+  const scaleZ = asset.scale?.z || 1.0;
+
+  switch (asset.type) {
+    case 'ap':
+      return { width: 0.8, depth: 0.8 };
+    case 'dp':
+    case 'tp':
+    case 'door_access':
+    case 'intercom':
+      return { width: 0.4, depth: 0.4 };
+    case 'power_outlet':
+      return { width: 0.6, depth: 0.6 };
+    case 'cctv':
+      return { width: 0.5, depth: 0.5 };
+    case 'desk_single':
+      return { width: 1.2, depth: 0.7 };
+    case 'desk_cluster_4':
+    case 'desk_cluster_6':
+      return { width: scaleX, depth: scaleZ };
+    case 'conference_table':
+      return { width: scaleX, depth: scaleZ };
+    case 'chair_office':
+    case 'chair_lounge':
+      return { width: 0.6, depth: 0.6 };
+    case 'reception_desk':
+      return { width: 2.4, depth: 1.2 };
+    case 'whiteboard':
+      return { width: 0.2, depth: 1.2 };
+    case 'cabinet':
+      return { width: 1.0, depth: 0.5 };
+    case 'plant_pot':
+      return { width: 0.6, depth: 0.6 };
+    default:
+      return { width: 0.8, depth: 0.8 };
+  }
+}
+
+function isOverlapping(assetA: PlacedAsset, assetB: PlacedAsset): boolean {
+  const sizeA = getAssetSize(assetA);
+  const sizeB = getAssetSize(assetB);
+  
+  const rA = Math.max(sizeA.width, sizeA.depth) * 0.42;
+  const rB = Math.max(sizeB.width, sizeB.depth) * 0.42;
+  
+  const dx = assetA.position.x - assetB.position.x;
+  const dz = assetA.position.z - assetB.position.z;
+  const dist = Math.sqrt(dx * dx + dz * dz);
+  
+  return dist < (rA + rB);
+}
+
+function isAssetOutsideRooms(asset: PlacedAsset, rooms: RoomDefinition[]): boolean {
+  if (rooms.length === 0) return false;
+  
+  const size = getAssetSize(asset);
+  const halfW = size.width / 2;
+  const halfD = size.depth / 2;
+  
+  return !rooms.some((room) => {
+    const roomMinX = room.x - room.width / 2;
+    const roomMaxX = room.x + room.width / 2;
+    const roomMinZ = room.z - room.depth / 2;
+    const roomMaxZ = room.z + room.depth / 2;
+    
+    const assetMinX = asset.position.x - halfW;
+    const assetMaxX = asset.position.x + halfW;
+    const assetMinZ = asset.position.z - halfD;
+    const assetMaxZ = asset.position.z + halfD;
+    
+    return (
+      assetMinX >= roomMinX - 0.08 &&
+      assetMaxX <= roomMaxX + 0.08 &&
+      assetMinZ >= roomMinZ - 0.08 &&
+      assetMaxZ <= roomMaxZ + 0.08
+    );
+  });
+}
+
 interface CADSidebarProps {
   rooms: RoomDefinition[];
   assets: PlacedAsset[];
@@ -56,7 +136,6 @@ export default function CADSidebar({
   
   // Custom Room creation local states
   const [newRoomName, setNewRoomName] = useState('');
-  const [newRoomArea, setNewRoomArea] = useState(150);
   const [newRoomWidth, setNewRoomWidth] = useState(4.0);
   const [newRoomDepth, setNewRoomDepth] = useState(4.0);
   const [newRoomColor, setNewRoomColor] = useState('#f0f9ff');
@@ -170,7 +249,7 @@ void syncDeviceCoordinates_FromFloorPlanner(map deviceDataMap) {
       rooms: rooms.map(r => ({
         id: r.id,
         name: r.name,
-        areaSqFt: r.areaSqFt,
+        areaSqFt: Math.round(r.width * r.depth * 10.7639),
         dimensions: { width: r.width, depth: r.depth },
         coordinates: { x: r.x, z: r.z },
         itemAllocations: assets.filter(a => a.assignedRoomId === r.id).map(a => ({ id: a.id, name: a.name, type: a.type }))
@@ -221,7 +300,7 @@ void syncDeviceCoordinates_FromFloorPlanner(map deviceDataMap) {
     
     onAddRoom({
       name: newRoomName,
-      areaSqFt: newRoomArea,
+      areaSqFt: Math.round(Number(newRoomWidth) * Number(newRoomDepth) * 10.7639),
       width: Number(newRoomWidth),
       depth: Number(newRoomDepth),
       color: newRoomColor,
@@ -432,14 +511,13 @@ void syncDeviceCoordinates_FromFloorPlanner(map deviceDataMap) {
                   </div>
                   
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 block font-mono">Design Area (SQFT)</label>
+                    <label className="text-[10px] font-bold text-slate-400 block font-mono">Design Area (SQFT) [Auto]</label>
                     <input
-                      type="number"
-                      min="10"
-                      max="10000"
-                      value={newRoomArea}
-                      onChange={(e) => setNewRoomArea(Number(e.target.value))}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
+                      type="text"
+                      readOnly
+                      value={`${Math.round(Number(newRoomWidth) * Number(newRoomDepth) * 10.7639)} SQFT`}
+                      className="w-full bg-slate-100 border border-slate-200/80 rounded-lg px-2.5 py-1.5 text-xs text-slate-505 font-mono font-bold select-none cursor-not-allowed opacity-90"
+                      title="Automatically calculated from Room Width and Depth dimensions"
                     />
                   </div>
 
@@ -512,7 +590,7 @@ void syncDeviceCoordinates_FromFloorPlanner(map deviceDataMap) {
                           />
                           <div>
                             <span className="font-bold text-slate-800 block leading-tight">{room.name}</span>
-                            <span className="text-[10.5px] text-slate-550 font-mono block mt-0.5">{room.areaSqFt} SQFT | {room.width}m x {room.depth}m | {occupantsCount} nodes</span>
+                            <span className="text-[10.5px] text-slate-550 font-mono block mt-0.5">{Math.round(room.width * room.depth * 10.7639)} SQFT | {room.width}m x {room.depth}m | {occupantsCount} nodes</span>
                           </div>
                         </div>
                         
@@ -922,6 +1000,24 @@ void syncOfficeLayout(map data) {
               <span>COORDINATE MAP:</span>
               <span className="font-bold text-slate-500">X: {selectedAsset.position.x.toFixed(2)}m, Z: {selectedAsset.position.z.toFixed(2)}m</span>
             </div>
+
+            {(() => {
+              const isOutside = isAssetOutsideRooms(selectedAsset, rooms);
+              const isColliding = assets.some((other) => other.id !== selectedAsset.id && isOverlapping(selectedAsset, other));
+              if (isOutside || isColliding) {
+                return (
+                  <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-[10px] font-medium flex flex-col gap-1 mt-1">
+                    <div className="font-bold flex items-center gap-1.5 font-mono uppercase tracking-wider text-[9px] text-rose-600">
+                      <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse inline-block" />
+                      Placement Conflict Alert
+                    </div>
+                    {isOutside && <div className="leading-tight">• Selected asset is placed outside defined room boundaries</div>}
+                    {isColliding && <div className="leading-tight">• Selected asset overlaps with another physical entity</div>}
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
         ) : (
           <div className="py-4 text-center text-slate-400 text-xs italic font-sans flex flex-col items-center justify-center gap-1.5" id="inspector-placeholder">

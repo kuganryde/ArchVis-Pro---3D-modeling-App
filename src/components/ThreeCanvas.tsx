@@ -3,6 +3,143 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PlacedAsset, RoomDefinition } from '../types';
 
+function getOccupancyColor(assetCount: number, width: number, depth: number): string {
+  const areaSqFt = width * depth * 10.7639;
+  const capacity = Math.max(1, Math.floor(areaSqFt / 80));
+  const ratio = Math.min(1.5, assetCount / capacity);
+  
+  if (assetCount === 0) {
+    return '#10b981'; // Cozy emerald green for empty/light space
+  }
+  
+  // Interpolate between Emerald Green (16, 185, 129) -> Amber (245, 158, 11) -> Warning Red (239, 68, 68)
+  if (ratio <= 0.6) {
+    const t = ratio / 0.6;
+    const r = Math.round(16 + (245 - 16) * t);
+    const g = Math.round(185 + (158 - 185) * t);
+    const b = Math.round(129 + (11 - 129) * t);
+    return `rgb(${r}, ${g}, ${b})`;
+  } else {
+    const t = Math.min(1.0, (ratio - 0.6) / 0.9);
+    const r = Math.round(245 + (239 - 245) * t);
+    const g = Math.round(158 + (68 - 158) * t);
+    const b = Math.round(11 + (68 - 11) * t);
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+}
+
+function getAssetSize(asset: PlacedAsset): { width: number; depth: number } {
+  const scaleX = asset.scale?.x || 1.0;
+  const scaleZ = asset.scale?.z || 1.0;
+
+  switch (asset.type) {
+    case 'ap':
+      return { width: 0.8, depth: 0.8 };
+    case 'dp':
+    case 'tp':
+    case 'door_access':
+    case 'intercom':
+      return { width: 0.4, depth: 0.4 };
+    case 'power_outlet':
+      return { width: 0.6, depth: 0.6 };
+    case 'cctv':
+      return { width: 0.5, depth: 0.5 };
+    case 'desk_single':
+      return { width: 1.2, depth: 0.7 };
+    case 'desk_cluster_4':
+    case 'desk_cluster_6':
+      return { width: scaleX, depth: scaleZ };
+    case 'conference_table':
+      return { width: scaleX, depth: scaleZ };
+    case 'chair_office':
+    case 'chair_lounge':
+      return { width: 0.6, depth: 0.6 };
+    case 'reception_desk':
+      return { width: 2.4, depth: 1.2 };
+    case 'whiteboard':
+      return { width: 0.2, depth: 1.2 };
+    case 'cabinet':
+      return { width: 1.0, depth: 0.5 };
+    case 'plant_pot':
+      return { width: 0.6, depth: 0.6 };
+    default:
+      return { width: 0.8, depth: 0.8 };
+  }
+}
+
+function isOverlapping(assetA: PlacedAsset, assetB: PlacedAsset): boolean {
+  const sizeA = getAssetSize(assetA);
+  const sizeB = getAssetSize(assetB);
+  
+  // Use circle collision approximation for natural layout spacing tolerance
+  const rA = Math.max(sizeA.width, sizeA.depth) * 0.42;
+  const rB = Math.max(sizeB.width, sizeB.depth) * 0.42;
+  
+  const dx = assetA.position.x - assetB.position.x;
+  const dz = assetA.position.z - assetB.position.z;
+  const dist = Math.sqrt(dx * dx + dz * dz);
+  
+  return dist < (rA + rB);
+}
+
+function isAssetOutsideRooms(asset: PlacedAsset, rooms: RoomDefinition[]): boolean {
+  if (rooms.length === 0) return false;
+  
+  const size = getAssetSize(asset);
+  const halfW = size.width / 2;
+  const halfD = size.depth / 2;
+  
+  return !rooms.some((room) => {
+    const roomMinX = room.x - room.width / 2;
+    const roomMaxX = room.x + room.width / 2;
+    const roomMinZ = room.z - room.depth / 2;
+    const roomMaxZ = room.z + room.depth / 2;
+    
+    const assetMinX = asset.position.x - halfW;
+    const assetMaxX = asset.position.x + halfW;
+    const assetMinZ = asset.position.z - halfD;
+    const assetMaxZ = asset.position.z + halfD;
+    
+    // Allow a small nesting tolerance
+    return (
+      assetMinX >= roomMinX - 0.08 &&
+      assetMaxX <= roomMaxX + 0.08 &&
+      assetMinZ >= roomMinZ - 0.08 &&
+      assetMaxZ <= roomMaxZ + 0.08
+    );
+  });
+}
+
+function applyConflictMaterials(group: THREE.Group) {
+  group.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      if (child.material) {
+        if (Array.isArray(child.material)) {
+          child.material = child.material.map((mat) => {
+            const cloned = mat.clone();
+            if ('color' in cloned) {
+              cloned.color.set('#f43f5e');
+            }
+            if ('emissive' in cloned) {
+              cloned.emissive.set('#9f1239'); // vivid warning red glow
+            }
+            return cloned;
+          });
+        } else {
+          const cloned = child.material.clone();
+          if ('color' in cloned) {
+            cloned.color.set('#f43f5e');
+          }
+          if ('emissive' in cloned) {
+            cloned.emissive.set('#9f1239'); // vivid warning red glow
+          }
+          child.material = cloned;
+        }
+      }
+    }
+  });
+}
+
 interface ThreeCanvasProps {
   rooms: RoomDefinition[];
   assets: PlacedAsset[];
@@ -12,6 +149,7 @@ interface ThreeCanvasProps {
   viewMode: '2D' | '3D';
   activeCategoryFilter: 'all' | 'furniture' | 'infrastructure';
   activeAssetTypeFilter: string | 'all';
+  showOccupancyHeatmap?: boolean;
 }
 
 export default function ThreeCanvas({
@@ -23,6 +161,7 @@ export default function ThreeCanvas({
   viewMode,
   activeCategoryFilter,
   activeAssetTypeFilter,
+  showOccupancyHeatmap = false,
 }: ThreeCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -45,7 +184,23 @@ export default function ThreeCanvas({
   const mouseRef = useRef<THREE.Vector2>(new THREE.Vector2());
 
   // Room overlay projections
-  const [projectedRooms, setProjectedRooms] = useState<Array<{ id: string; name: string; area: number; x: number; y: number; textColor: string }>>([]);
+  const [projectedRooms, setProjectedRooms] = useState<Array<{ id: string; name: string; area: number; assetCount: number; loadPercentage: number; x: number; y: number; textColor: string }>>([]);
+
+  const roomsRef = useRef(rooms);
+  const assetsRef = useRef(assets);
+  const showOccupancyHeatmapRef = useRef(showOccupancyHeatmap);
+
+  useEffect(() => {
+    roomsRef.current = rooms;
+  }, [rooms]);
+
+  useEffect(() => {
+    assetsRef.current = assets;
+  }, [assets]);
+
+  useEffect(() => {
+    showOccupancyHeatmapRef.current = showOccupancyHeatmap;
+  }, [showOccupancyHeatmap]);
 
   // Initialize ThreeJS Scene
   useEffect(() => {
@@ -129,15 +284,25 @@ export default function ThreeCanvas({
       if (sceneRef.current && cameraRef.current && rendererRef.current) {
         const tempV = new THREE.Vector3();
         const rect = renderer.domElement.getBoundingClientRect();
-        const list = rooms.map((r) => {
+        const list = roomsRef.current.map((r) => {
           tempV.set(r.x, 0, r.z);
           tempV.project(camera);
           const x = (tempV.x * .5 + .5) * rect.width;
           const y = (-(tempV.y) * .5 + .5) * rect.height;
+          
+          // Calculate dynamic occupancy counts and load percentage
+          const roomAssets = assetsRef.current.filter((a) => a.assignedRoomId === r.id);
+          const assetCount = roomAssets.length;
+          const areaSqFt = r.width * r.depth * 10.7639;
+          const capacity = Math.max(1, Math.floor(areaSqFt / 80));
+          const loadPercentage = Math.round((assetCount / capacity) * 100);
+
           return {
             id: r.id,
             name: r.name,
-            area: r.areaSqFt,
+            area: Math.round(r.width * r.depth * 10.7639),
+            assetCount,
+            loadPercentage,
             x,
             y,
             textColor: r.textColor || '#000000',
@@ -205,12 +370,19 @@ export default function ThreeCanvas({
 
       // Floor plane tile
       const floorGeo = new THREE.BoxGeometry(room.width, 0.06, room.depth);
+      
+      let floorColor = room.color;
+      if (showOccupancyHeatmap) {
+        const roomAssets = assets.filter((a) => a.assignedRoomId === room.id);
+        floorColor = getOccupancyColor(roomAssets.length, room.width, room.depth);
+      }
+
       const floorMat = new THREE.MeshStandardMaterial({
-        color: new THREE.Color(room.color),
+        color: new THREE.Color(floorColor),
         roughness: 0.9,
         metalness: 0.05,
         transparent: true,
-        opacity: 0.65,
+        opacity: showOccupancyHeatmap ? 0.75 : 0.65,
       });
       const floorMesh = new THREE.Mesh(floorGeo, floorMat);
       floorMesh.position.set(room.x, 0.03, room.z);
@@ -244,7 +416,7 @@ export default function ThreeCanvas({
     });
 
     scene.add(roomPlanGroup);
-  }, [rooms, viewMode]);
+  }, [rooms, viewMode, assets, showOccupancyHeatmap]);
 
   // Helper to construct architectural walls
   function createWallMesh(
@@ -326,12 +498,46 @@ export default function ThreeCanvas({
       group.position.set(asset.position.x, asset.position.y, asset.position.z);
       group.rotation.y = asset.rotationY;
 
+      // Handle collision checking (overlap with another asset or outside defined room boundaries)
+      const isOutside = isAssetOutsideRooms(asset, rooms);
+      const isOverlappingOther = assets.some((other) => other.id !== asset.id && isOverlapping(asset, other));
+      const hasConflict = isOutside || isOverlappingOther;
+
+      if (hasConflict) {
+        applyConflictMaterials(group);
+
+        // Vivid red glowing danger outline/ring
+        const conflictRingGeo = new THREE.RingGeometry(0.75, 0.85, 32);
+        const conflictRingMat = new THREE.MeshBasicMaterial({
+          color: '#f43f5e',
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.9,
+        });
+        const conflictRing = new THREE.Mesh(conflictRingGeo, conflictRingMat);
+        conflictRing.rotation.x = Math.PI / 2;
+        conflictRing.position.y = 0.09;
+        group.add(conflictRing);
+
+        // Translucent danger alert beacon cone/cylinder
+        const alertGeo = new THREE.CylinderGeometry(0.02, 0.65, 1.4, 16, 1, true);
+        const alertMat = new THREE.MeshBasicMaterial({
+          color: '#f43f5e',
+          transparent: true,
+          opacity: 0.3,
+          side: THREE.DoubleSide,
+        });
+        const alertBeacon = new THREE.Mesh(alertGeo, alertMat);
+        alertBeacon.position.y = 0.7;
+        group.add(alertBeacon);
+      }
+
       // Handle selection ring visual queues
       if (asset.id === selectedAssetId) {
         // High-contrast glowing cyan selection ring
         const ringGeo = new THREE.RingGeometry(0.7, 0.8, 32);
         const ringMat = new THREE.MeshBasicMaterial({
-          color: '#06b6d4',
+          color: hasConflict ? '#f43f5e' : '#06b6d4',
           side: THREE.DoubleSide,
           transparent: true,
           opacity: 0.8,
@@ -344,7 +550,7 @@ export default function ThreeCanvas({
         // Selection beacon pulsing animation
         const beaconGeo = new THREE.CylinderGeometry(0.02, 0.5, 1.2, 16, 1, true);
         const beaconMat = new THREE.MeshBasicMaterial({
-          color: '#06b6d4',
+          color: hasConflict ? '#f43f5e' : '#06b6d4',
           transparent: true,
           opacity: 0.25,
           side: THREE.DoubleSide
@@ -360,7 +566,7 @@ export default function ThreeCanvas({
 
     scene.add(assetsGroup);
     assetMeshesRef.current = meshMap;
-  }, [assets, selectedAssetId, activeCategoryFilter, activeAssetTypeFilter, viewMode]);
+  }, [assets, rooms, selectedAssetId, activeCategoryFilter, activeAssetTypeFilter, viewMode]);
 
   // Generates procedurally crafted Three.js geometric items for outstanding interior and low-current fidelity
   function buildProceduralAssetMesh(asset: PlacedAsset, group: THREE.Group) {
@@ -879,23 +1085,42 @@ export default function ThreeCanvas({
 
       {/* 2D HTML Room Labels Projections HUD Overlay */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden" id="room-labels-canvas-overlay">
-        {projectedRooms.map((room) => (
-          <div
-            key={room.id}
-            className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center text-center transition-all duration-150"
-            style={{ left: room.x, top: room.y }}
-          >
-            <span
-              className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white/90 shadow-xs border border-slate-200/50 select-none pointer-events-none"
-              style={{ color: room.textColor }}
+        {projectedRooms.map((room) => {
+          let badgeColor = 'text-emerald-700 bg-emerald-50 border-emerald-200/60';
+          let statusText = 'Cozy';
+          if (room.loadPercentage > 120) {
+            badgeColor = 'text-rose-700 bg-rose-50 border-rose-200/60 animate-pulse';
+            statusText = 'Overloaded';
+          } else if (room.loadPercentage > 60) {
+            badgeColor = 'text-amber-700 bg-amber-50 border-amber-200/60';
+            statusText = 'Busy';
+          }
+
+          return (
+            <div
+              key={room.id}
+              className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center text-center transition-all duration-150"
+              style={{ left: room.x, top: room.y }}
             >
-              {room.name}
-            </span>
-            <span className="text-[10px] font-mono text-slate-500 bg-white/70 px-1 py-0.2 rounded-sm mt-0.5 select-none pointer-events-none">
-              {room.area} SQFT
-            </span>
-          </div>
-        ))}
+              <span
+                className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-white/95 text-slate-800 shadow-xs border border-slate-200 select-none pointer-events-none mb-1 inline-block"
+                style={{ borderLeftColor: room.textColor, borderLeftWidth: '3.5px' }}
+              >
+                {room.name}
+              </span>
+              <div className="flex items-center gap-1.5 flex-nowrap shrink-0">
+                <span className="text-[9.5px] font-mono font-bold text-slate-550 bg-white/80 border border-slate-200/50 px-1.5 py-0.5 rounded-md select-none pointer-events-none shadow-3xs">
+                  {room.area} SQFT
+                </span>
+                {showOccupancyHeatmap && (
+                  <span className={`text-[9.5px] font-mono font-extrabold px-1.5 py-0.5 border rounded-md shadow-3xs select-none pointer-events-none ${badgeColor}`}>
+                    {room.assetCount} Nodes | {room.loadPercentage}% ({statusText})
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Real-time floating inspector HUD */}
@@ -923,6 +1148,24 @@ export default function ThreeCanvas({
                 </div>
               )}
               <div className="text-[10px] mt-2 text-slate-400 font-mono">Position: X {hoveredAsset.position.x.toFixed(1)}m, Z {hoveredAsset.position.z.toFixed(1)}m</div>
+              
+              {(() => {
+                const isOutside = isAssetOutsideRooms(hoveredAsset, rooms);
+                const isColliding = assets.some((other) => other.id !== hoveredAsset.id && isOverlapping(hoveredAsset, other));
+                if (isOutside || isColliding) {
+                  return (
+                    <div className="mt-2.5 p-2.5 bg-rose-50 border border-rose-200/60 rounded-xl text-rose-700 text-[10px] font-medium flex flex-col gap-1">
+                      <div className="font-bold flex items-center gap-1 font-mono uppercase tracking-wider text-[9px] text-rose-600">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse inline-block" />
+                        Placement Alert
+                      </div>
+                      {isOutside && <div className="leading-tight">• Positioning is outside defined room boundaries</div>}
+                      {isColliding && <div className="leading-tight">• Position overlaps with another physical asset</div>}
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
           ) : hoveredRoom ? (
             <div className="font-sans">
@@ -930,7 +1173,7 @@ export default function ThreeCanvas({
                 <span className="w-3 h-3 rounded-sm border border-slate-300" style={{ backgroundColor: hoveredRoom.color }} />
                 {hoveredRoom.name}
               </h4>
-              <p className="text-xs text-slate-500 font-mono mb-2">Area: {hoveredRoom.areaSqFt} SQFT (~{(hoveredRoom.areaSqFt * 0.0929).toFixed(1)} m²)</p>
+              <p className="text-xs text-slate-500 font-mono mb-2">Area: {Math.round(hoveredRoom.width * hoveredRoom.depth * 10.7639)} SQFT (~{(hoveredRoom.width * hoveredRoom.depth).toFixed(1)} m²)</p>
               <div className="space-y-1 border-t border-slate-100 pt-2 text-[11px] text-slate-600 flex flex-col gap-0.5">
                 <div className="flex justify-between">
                   <span>Room Width:</span>
@@ -940,10 +1183,52 @@ export default function ThreeCanvas({
                   <span>Room Depth:</span>
                   <span className="font-semibold text-slate-850">{hoveredRoom.depth.toFixed(1)}m</span>
                 </div>
-                <div className="flex justify-between border-t border-slate-50 pt-1 mt-1 font-semibold text-blue-600">
-                  <span>Allocated Items:</span>
-                  <span>{assets.filter(a => a.assignedRoomId === hoveredRoom.id).length} items</span>
-                </div>
+                
+                {/* Real-time Occupancy Load Section */}
+                {(() => {
+                  const roomAssets = assets.filter(a => a.assignedRoomId === hoveredRoom.id);
+                  const count = roomAssets.length;
+                  const areaSqFt = hoveredRoom.width * hoveredRoom.depth * 10.7639;
+                  const capacity = Math.max(1, Math.floor(areaSqFt / 80));
+                  const percentage = Math.round((count / capacity) * 100);
+                  
+                  let colorClass = 'text-emerald-600';
+                  let status = 'Comfortable / Low Load';
+                  if (count > 0) {
+                    if (percentage > 120) {
+                      colorClass = 'text-rose-600 font-bold';
+                      status = 'Highly Congested / Overloaded';
+                    } else if (percentage > 60) {
+                      colorClass = 'text-amber-600 font-semibold';
+                      status = 'Optimal Working Load';
+                    } else {
+                      colorClass = 'text-emerald-600';
+                      status = 'Comfortable / Low Load';
+                    }
+                  } else {
+                    status = 'Fully Vacant';
+                  }
+
+                  return (
+                    <>
+                      <div className="flex justify-between border-t border-slate-50 pt-1 mt-1 font-semibold text-slate-700">
+                        <span>Allocated Devices:</span>
+                        <span>{count} items</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Max Nodes Capacity:</span>
+                        <span className="font-mono text-slate-500">{capacity} units</span>
+                      </div>
+                      <div className="flex justify-between items-center border-t border-slate-100 pt-1.5 mt-1.5">
+                        <span className="text-[10px] font-bold text-slate-400 font-mono block uppercase">Load Index:</span>
+                        <span className={`text-xs font-bold ${colorClass}`}>{percentage}%</span>
+                      </div>
+                      <div className="text-[10px] italic text-slate-450 mt-1 leading-tight">
+                        Status: <span className={colorClass}>{status}</span>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           ) : null}
@@ -964,6 +1249,20 @@ export default function ThreeCanvas({
           <div><b className="text-slate-805">Zoom:</b> Scroll Mouse Wheel / Slide Touchpad</div>
           <div><b className="text-slate-805">Drag:</b> Left-Click hold on any item to move</div>
         </div>
+        {showOccupancyHeatmap && (
+          <div className="px-3.5 py-2.5 rounded-xl bg-white/95 border border-slate-200 shadow-md text-[10.5px] pointer-events-auto flex flex-col gap-1.5 max-w-[240px] transition-all select-none font-sans">
+            <div className="font-bold text-slate-850 flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-mono">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Occupancy Heatmap</span>
+            </div>
+            <div className="h-2 w-full rounded bg-gradient-to-r from-emerald-500 via-amber-400 to-rose-500 border border-slate-200/50" />
+            <div className="flex justify-between text-[9px] font-bold text-slate-400 font-mono">
+              <span>Cozy (0%)</span>
+              <span>Optimal (50%)</span>
+              <span>Busy (100%+)</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
