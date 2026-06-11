@@ -17,7 +17,11 @@ import {
   Workflow,
   Hammer,
   Sparkles,
-  Layers
+  Layers,
+  FileImage,
+  Upload,
+  Settings,
+  MessageSquare
 } from 'lucide-react';
 import { PlacedAsset, RoomDefinition, ZohoCreatorConfig, getAssetHeightLayer } from '../types';
 
@@ -130,6 +134,25 @@ interface CADSidebarProps {
   showCablingPaths: boolean;
   onSetShowCablingPaths: (v: boolean) => void;
   onApplyRoomSetupTemplate: (roomId: string, templateType: string) => void;
+  onResetCanvas: () => void;
+  onImportJSON: (json: any) => void;
+  onRebuildFromPrompt: (prompt: string) => Promise<void>;
+  
+  // Custom Blueprint Underlay/Uploader interface
+  blueprintImage: string | null;
+  onBlueprintLoaded: (image: string | null, aspect: number) => void;
+  blueprintOpacity: number;
+  onSetBlueprintOpacity: (opacity: number) => void;
+  blueprintScale: number;
+  onSetBlueprintScale: (scale: number) => void;
+  blueprintOffsetX: number;
+  onSetBlueprintOffsetX: (x: number) => void;
+  blueprintOffsetZ: number;
+  onSetBlueprintOffsetZ: (z: number) => void;
+  blueprintVisible: boolean;
+  onSetBlueprintVisible: (v: boolean) => void;
+  onDigitizeBlueprint: (base64Data: string, mimeType: string) => Promise<void>;
+  isDigitizing: boolean;
 }
 
 export default function CADSidebar({
@@ -153,7 +176,25 @@ export default function CADSidebar({
   onSetShowWifiHeatmap,
   showCablingPaths,
   onSetShowCablingPaths,
-  onApplyRoomSetupTemplate
+  onApplyRoomSetupTemplate,
+  onResetCanvas,
+  onImportJSON,
+  onRebuildFromPrompt,
+  
+  blueprintImage,
+  onBlueprintLoaded,
+  blueprintOpacity,
+  onSetBlueprintOpacity,
+  blueprintScale,
+  onSetBlueprintScale,
+  blueprintOffsetX,
+  onSetBlueprintOffsetX,
+  blueprintOffsetZ,
+  onSetBlueprintOffsetZ,
+  blueprintVisible,
+  onSetBlueprintVisible,
+  onDigitizeBlueprint,
+  isDigitizing
 }: CADSidebarProps) {
   
   // Custom Room creation local states
@@ -161,6 +202,118 @@ export default function CADSidebar({
   const [newRoomWidth, setNewRoomWidth] = useState(4.0);
   const [newRoomDepth, setNewRoomDepth] = useState(4.0);
   const [newRoomColor, setNewRoomColor] = useState('#f0f9ff');
+
+  // Blueprint file uploader local states
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
+
+  // Dynamic uploader for JPEG, PNG, PDF formats
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessingFile(true);
+    setFileError(null);
+
+    const fileName = file.name.toLowerCase();
+    
+    try {
+      if (fileName.endsWith('.pdf')) {
+        // Dynamic loading function for PDF.js CDN
+        const loadPDFJS = (): Promise<any> => {
+          return new Promise((resolve, reject) => {
+            const win = window as any;
+            if (win.pdfjsLib) {
+              resolve(win.pdfjsLib);
+              return;
+            }
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js';
+            script.onload = () => {
+              win.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+              resolve(win.pdfjsLib);
+            };
+            script.onerror = () => reject(new Error('Failed to load PDF processing engine.'));
+            document.head.appendChild(script);
+          });
+        };
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          try {
+            const typedarray = new Uint8Array(event.target?.result as ArrayBuffer);
+            const pdfjs = await loadPDFJS();
+            const pdf = await pdfjs.getDocument({ data: typedarray }).promise;
+            
+            if (pdf.numPages === 0) {
+              throw new Error('This PDF has no readable pages.');
+            }
+            
+            const page = await pdf.getPage(1);
+            const viewport = page.getViewport({ scale: 2.0 }); // higher scale for crisp high-density texture!
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            
+            if (!context) throw new Error('Could not instantiate drawing context.');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+
+            const renderContext = {
+              canvasContext: context,
+              viewport: viewport
+            };
+            
+            await page.render(renderContext).promise;
+            const dataUrl = canvas.toDataURL('image/png');
+            const aspect = viewport.width / viewport.height;
+            
+            onBlueprintLoaded(dataUrl, aspect);
+            setIsProcessingFile(false);
+
+            // Trigger feedback toast
+            const toast = document.createElement('div');
+            toast.className = "fixed bottom-14 right-5 bg-blue-600 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-blue-400 z-50 flex items-center gap-1.5 animate-in slide-in-from-bottom-4 duration-300";
+            toast.innerHTML = `<span>Rendered PDF Blueprint Page 1 successfully to 3D canvas ground!</span>`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
+          } catch (err: any) {
+            console.error(err);
+            setFileError(err.message || 'Failed parsing PDF document.');
+            setIsProcessingFile(false);
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      } else {
+        // Generic photo formats like JPEG, JPG, PNG, WEBP, SVG
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const dataUrl = event.target?.result as string;
+          const img = new Image();
+          img.onload = () => {
+            const aspect = img.width / img.height;
+            onBlueprintLoaded(dataUrl, aspect);
+            setIsProcessingFile(false);
+
+            const toast = document.createElement('div');
+            toast.className = "fixed bottom-14 right-5 bg-blue-600 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-blue-400 z-50 flex items-center gap-1.5 animate-in slide-in-from-bottom-4 duration-300";
+            toast.innerHTML = `<span>Uploaded Blueprint Image successfully to 3D canvas ground!</span>`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
+          };
+          img.onerror = () => {
+            setFileError('Invalid image format uploaded.');
+            setIsProcessingFile(false);
+          };
+          img.src = dataUrl;
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setFileError(err.message || 'Error loading file.');
+      setIsProcessingFile(false);
+    }
+  };
 
   // Search state inside Reporting module
   const [assetSearchQuery, setAssetSearchQuery] = useState('');
@@ -598,6 +751,226 @@ void syncDeviceCoordinates_FromFloorPlanner(map deviceDataMap) {
           {/* ==================== ROOMS TAB ==================== */}
           {activeTab === 'rooms' && (
             <div className="space-y-4 animate-in fade-in duration-200">
+              
+              {/* quick actions */}
+              <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/30 space-y-3">
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                  <Settings2 className="w-3.5 h-3.5 text-blue-600" />
+                  Quick Canvas Actions
+                </h3>
+                
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={onResetCanvas} className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-slate-200 hover:border-red-300 hover:bg-red-50 text-slate-600 hover:text-red-700 text-xs font-bold transition-all shadow-xs">
+                    <Trash2 className="w-3.5 h-3.5"/> Blank Canvas
+                  </button>
+                  <label className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 text-xs font-bold transition-all shadow-xs cursor-pointer">
+                    <Database className="w-3.5 h-3.5"/> Import JSON
+                    <input type="file" accept=".json" onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        try {
+                          const json = JSON.parse(ev.target?.result as string);
+                          onImportJSON(json);
+                        } catch (err) { alert('Invalid JSON file'); }
+                      };
+                      reader.readAsText(file);
+                    }} hidden />
+                  </label>
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      placeholder="Prompt AI to rebuild layout..."
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          onRebuildFromPrompt((e.target as HTMLInputElement).value);
+                          (e.target as HTMLInputElement).value = '';
+                        }
+                      }}
+                      className="w-full text-xs py-2 pl-8 pr-3 rounded-lg border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-sans"                
+                    />
+                    <MessageSquare className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+                  </div>
+                </div>
+              </div>
+
+              {/* FLOOR PLAN BLUEPRINT UPLOADER & TRACING CONTROLS */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs space-y-4">
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center justify-between border-b border-slate-100 pb-2 mb-1 font-mono">
+                  <span className="flex items-center gap-1.5">
+                    <FileImage className="w-3.5 h-3.5 text-blue-600" />
+                    Blueprint Uploader
+                  </span>
+                  {blueprintImage && (
+                    <span className="text-[10px] bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full border border-green-200 font-bold font-sans animate-pulse">
+                      Active Guide
+                    </span>
+                  )}
+                </h3>
+
+                {/* FILE DRAG ZONE */}
+                <div className="relative">
+                  <label 
+                    className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
+                      blueprintImage 
+                        ? 'border-blue-300 bg-blue-50/20 hover:bg-blue-50/40' 
+                        : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input 
+                      type="file" 
+                      accept=".pdf, image/png, image/jpeg, image/jpg, image/webp, image/svg+xml" 
+                      onChange={handleFileChange} 
+                      className="hidden" 
+                    />
+                    <Upload className={`w-6 h-6 mb-2 ${blueprintImage ? 'text-blue-500 animate-bounce' : 'text-slate-400'}`} />
+                    <span className="text-xs font-bold text-slate-700 block">
+                      {blueprintImage ? 'Replace active blueprints' : 'Upload floor plan blueprint'}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block mt-1 leading-normal">
+                      Supports PDF documents, JPEGs, and PNGs
+                    </span>
+                  </label>
+
+                  {isProcessingFile && (
+                    <div className="absolute inset-0 bg-white/85 flex flex-col items-center justify-center rounded-xl space-y-2">
+                      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-[10px] text-blue-700 font-bold font-mono">Rendering PDF layout to canvas...</span>
+                    </div>
+                  )}
+                </div>
+
+                {fileError && (
+                  <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-[10px] font-sans leading-relaxed">
+                    <strong>Upload Error:</strong> {fileError}
+                  </div>
+                )}
+
+                {/* TRACING POSITIONING MECHANICS (Shows only when blueprint loaded) */}
+                {blueprintImage && (
+                  <div className="space-y-3 pt-2 bg-slate-50/30 p-3 rounded-lg border border-slate-100">
+                    <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                      <span className="text-[10px] font-bold text-slate-800 uppercase tracking-wide font-mono flex items-center gap-1">
+                        <Settings className="w-3 h-3 text-slate-550" /> Trace Calibration
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onBlueprintLoaded(null, 1.33)}
+                        className="text-[10px] text-red-500 hover:text-red-700 hover:underline font-bold bg-transparent border-none cursor-pointer animate-in fade-in"
+                      >
+                        Clear Underlay
+                      </button>
+                    </div>
+
+                    {/* Visiblity Toggle */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10.5px] text-slate-600 font-medium">Overlay blueprint guide underlay</span>
+                      <input 
+                        type="checkbox"
+                        checked={blueprintVisible}
+                        onChange={(e) => onSetBlueprintVisible(e.target.checked)}
+                        className="w-4 h-4 rounded text-blue-600 accent-blue-600 cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Scale Sizer Slider */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-[10.5px]">
+                        <span className="text-slate-600 font-medium">Layout Target Width (Meters)</span>
+                        <span className="text-blue-700 font-mono font-bold">{blueprintScale}m</span>
+                      </div>
+                      <input 
+                        type="range"
+                        min="10"
+                        max="100"
+                        step="1"
+                        value={blueprintScale}
+                        onChange={(e) => onSetBlueprintScale(Number(e.target.value))}
+                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                      />
+                    </div>
+
+                    {/* Opacity slider */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-[10.5px]">
+                        <span className="text-slate-600 font-medium">Guide Map Opacity</span>
+                        <span className="text-blue-700 font-mono font-bold">{Math.round(blueprintOpacity * 100)}%</span>
+                      </div>
+                      <input 
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={blueprintOpacity}
+                        onChange={(e) => onSetBlueprintOpacity(Number(e.target.value))}
+                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                      />
+                    </div>
+
+                    {/* Offset coordinates */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <span className="text-[10px] text-slate-500 block font-mono">Offset X: {blueprintOffsetX}m</span>
+                        <input 
+                          type="range"
+                          min="-30"
+                          max="30"
+                          step="0.5"
+                          value={blueprintOffsetX}
+                          onChange={(e) => onSetBlueprintOffsetX(Number(e.target.value))}
+                          className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-650"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] text-slate-500 block font-mono">Offset Z: {blueprintOffsetZ}m</span>
+                        <input 
+                          type="range"
+                          min="-30"
+                          max="30"
+                          step="0.5"
+                          value={blueprintOffsetZ}
+                          onChange={(e) => onSetBlueprintOffsetZ(Number(e.target.value))}
+                          className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-650"
+                        />
+                      </div>
+                    </div>
+
+                    {/* AI OCR SCANNER BUTTON! */}
+                    <div className="border-t border-slate-200/50 pt-2.5 mt-1">
+                      <button
+                        type="button"
+                        disabled={isDigitizing}
+                        onClick={() => {
+                          const mime = blueprintImage.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
+                          const cleanBase64 = blueprintImage.replace(/^data:image\/[a-z]+;base64,/, '');
+                          onDigitizeBlueprint(cleanBase64, mime);
+                        }}
+                        className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md transition-all cursor-pointer border border-blue-500/30 disabled:opacity-80"
+                      >
+                        {isDigitizing ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>AI Digitizing Layout...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-3.5 h-3.5 text-white animate-pulse" />
+                            <span>Run AI Digitizer on Blueprint</span>
+                          </>
+                        )}
+                      </button>
+                      <p className="text-[9px] text-slate-400 mt-1.5 leading-normal text-center">
+                        Generates high-precision room spaces and suggested networking hardware automatically in 3D using server-side Gemini Vision OCR models.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Create dynamic Room Placer form */}
               <form onSubmit={triggerAddRoom} className="p-4 rounded-xl border border-slate-200 bg-slate-50/40 space-y-3">
                 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-200 pb-2 mb-1 font-mono">

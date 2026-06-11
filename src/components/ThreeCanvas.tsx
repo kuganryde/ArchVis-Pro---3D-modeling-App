@@ -159,6 +159,13 @@ interface ThreeCanvasProps {
   showOccupancyHeatmap?: boolean;
   showWifiHeatmap?: boolean;
   showCablingPaths?: boolean;
+  blueprintImage?: string | null;
+  blueprintOpacity?: number;
+  blueprintScale?: number;
+  blueprintAspect?: number;
+  blueprintOffsetX?: number;
+  blueprintOffsetZ?: number;
+  blueprintVisible?: boolean;
 }
 
 export default function ThreeCanvas({
@@ -173,6 +180,13 @@ export default function ThreeCanvas({
   showOccupancyHeatmap = false,
   showWifiHeatmap = false,
   showCablingPaths = false,
+  blueprintImage = null,
+  blueprintOpacity = 0.5,
+  blueprintScale = 30,
+  blueprintAspect = 1.33,
+  blueprintOffsetX = 0,
+  blueprintOffsetZ = 0,
+  blueprintVisible = true,
 }: ThreeCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -372,13 +386,65 @@ export default function ThreeCanvas({
     }
   }, [viewMode]);
 
+  // Handle Blueprint underlay plane rendering and texture loading
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+
+    // Clean up existing underlay
+    const existing = scene.getObjectByName('BLUEPRINT_UNDERLAY');
+    if (existing) {
+      scene.remove(existing);
+    }
+
+    if (!blueprintImage || !blueprintVisible) return;
+
+    // Load texture
+    const loader = new THREE.TextureLoader();
+    loader.load(
+      blueprintImage,
+      (texture) => {
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+
+        // Calculate aspect ratios
+        const bWidth = blueprintScale * blueprintAspect;
+        const bHeight = blueprintScale;
+
+        const geometry = new THREE.PlaneGeometry(bWidth, bHeight);
+        const material = new THREE.MeshBasicMaterial({
+          map: texture,
+          transparent: true,
+          opacity: blueprintOpacity,
+          side: THREE.DoubleSide,
+          depthWrite: false, // Prevents Z-fighting with grid and rooms
+        });
+
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.name = 'BLUEPRINT_UNDERLAY';
+        mesh.rotation.x = -Math.PI / 2;
+        // Position slightly above ground plate, below room boxes
+        mesh.position.set(blueprintOffsetX, -0.012, blueprintOffsetZ);
+
+        scene.add(mesh);
+      },
+      (err) => {
+        console.error('Error loading custom blueprint asset texture:', err);
+      }
+    );
+  }, [blueprintImage, blueprintVisible, blueprintOpacity, blueprintScale, blueprintAspect, blueprintOffsetX, blueprintOffsetZ]);
+
   // Re-generate Room Boxes and extruded walls when Rooms state or ViewMode updates
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;
 
-    const existingRoomPlan = scene.getObjectByName('ROOM_PLAN_GROUP');
-    if (existingRoomPlan) scene.remove(existingRoomPlan);
+    // Use traverse for more robust cleanup
+    const toRemove: THREE.Object3D[] = [];
+    scene.traverse((obj) => {
+      if (obj.name === 'ROOM_PLAN_GROUP') toRemove.push(obj);
+    });
+    toRemove.forEach(obj => scene.remove(obj));
 
     const roomPlanGroup = new THREE.Group();
     roomPlanGroup.name = 'ROOM_PLAN_GROUP';
@@ -514,8 +580,11 @@ export default function ThreeCanvas({
     if (!scene) return;
 
     // Remove existing assets group
-    const existingAssetsGroup = scene.getObjectByName('PLACED_ASSETS_GROUP');
-    if (existingAssetsGroup) scene.remove(existingAssetsGroup);
+    const toRemove: THREE.Object3D[] = [];
+    scene.traverse((obj) => {
+      if (obj.name === 'PLACED_ASSETS_GROUP') toRemove.push(obj);
+    });
+    toRemove.forEach(obj => scene.remove(obj));
 
     const assetsGroup = new THREE.Group();
     assetsGroup.name = 'PLACED_ASSETS_GROUP';
