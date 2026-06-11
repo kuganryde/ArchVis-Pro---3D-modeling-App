@@ -1,0 +1,6 @@
+{
+  "name": "Office 3D Floor Planner and Asset Manager",
+  "description": "An immersive 3D CAD office floor planner and low-current asset manager featuring interactive furniture layouts, dragging controls, real-time reporting, and custom Zoho Creator integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
