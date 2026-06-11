@@ -15,6 +15,8 @@ export type AssetType =
   | 'door_access'  // Door Access (Door Access - 3)
   | 'intercom'     // Intercom (Intercom - 1)
   | 'power_outlet' // New Power Outlet Markings (Blue)
+  | 'hdmi_port'    // HDMI Port
+  | 'projector_port' // Projector Interface Port
   // Furniture
   | 'desk_single'
   | 'desk_cluster_4'
@@ -30,6 +32,24 @@ export type AssetType =
   | 'glass_divider'
   | 'door_single'
   | 'plant_pot';
+
+export function getAssetHeightLayer(type: AssetType): 'ground' | 'ceiling' | 'port' {
+  if (type === 'ap' || type === 'cctv') {
+    return 'ceiling';
+  }
+  if (
+    type === 'dp' ||
+    type === 'tp' ||
+    type === 'power_outlet' ||
+    type === 'hdmi_port' ||
+    type === 'projector_port' ||
+    type === 'door_access' ||
+    type === 'intercom'
+  ) {
+    return 'port';
+  }
+  return 'ground';
+}
 
 export interface RoomDefinition {
   id: string;

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { PlacedAsset, RoomDefinition } from '../types';
+import { PlacedAsset, RoomDefinition, getAssetHeightLayer } from '../types';
 
 function getOccupancyColor(assetCount: number, width: number, depth: number): string {
   const areaSqFt = width * depth * 10.7639;
@@ -37,6 +37,8 @@ function getAssetSize(asset: PlacedAsset): { width: number; depth: number } {
       return { width: 0.8, depth: 0.8 };
     case 'dp':
     case 'tp':
+    case 'hdmi_port':
+    case 'projector_port':
     case 'door_access':
     case 'intercom':
       return { width: 0.4, depth: 0.4 };
@@ -68,6 +70,11 @@ function getAssetSize(asset: PlacedAsset): { width: number; depth: number } {
 }
 
 function isOverlapping(assetA: PlacedAsset, assetB: PlacedAsset): boolean {
+  // Only check collision if they are on the same height layer!
+  if (getAssetHeightLayer(assetA.type) !== getAssetHeightLayer(assetB.type)) {
+    return false;
+  }
+
   const sizeA = getAssetSize(assetA);
   const sizeB = getAssetSize(assetB);
   
@@ -150,6 +157,8 @@ interface ThreeCanvasProps {
   activeCategoryFilter: 'all' | 'furniture' | 'infrastructure';
   activeAssetTypeFilter: string | 'all';
   showOccupancyHeatmap?: boolean;
+  showWifiHeatmap?: boolean;
+  showCablingPaths?: boolean;
 }
 
 export default function ThreeCanvas({
@@ -162,6 +171,8 @@ export default function ThreeCanvas({
   activeCategoryFilter,
   activeAssetTypeFilter,
   showOccupancyHeatmap = false,
+  showWifiHeatmap = false,
+  showCablingPaths = false,
 }: ThreeCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -308,7 +319,15 @@ export default function ThreeCanvas({
             textColor: r.textColor || '#000000',
             inScope: tempV.z <= 1, // behind camera filter
           };
-        }).filter(item => item.inScope);
+        }).filter(item => 
+          item.inScope && 
+          typeof item.x === 'number' && 
+          typeof item.y === 'number' && 
+          !isNaN(item.x) && 
+          !isNaN(item.y) && 
+          isFinite(item.x) && 
+          isFinite(item.y)
+        );
         setProjectedRooms(list);
       }
 
@@ -375,6 +394,28 @@ export default function ThreeCanvas({
       if (showOccupancyHeatmap) {
         const roomAssets = assets.filter((a) => a.assignedRoomId === room.id);
         floorColor = getOccupancyColor(roomAssets.length, room.width, room.depth);
+      } else if (showWifiHeatmap) {
+        const apAssets = assets.filter((a) => a.type === 'ap');
+        if (apAssets.length === 0) {
+          floorColor = '#94a3b8'; // Slate grey indicating no Wi-Fi coverage whatsoever
+        } else {
+          // Compute distance from room center to the nearest AP
+          let minDistance = Infinity;
+          apAssets.forEach((ap) => {
+            const dx = ap.position.x - room.x;
+            const dz = ap.position.z - room.z;
+            const dist = Math.sqrt(dx * dx + dz * dz);
+            if (dist < minDistance) minDistance = dist;
+          });
+
+          if (minDistance < 6.5) {
+            floorColor = '#a7f3d0'; // Excellent (Mint / Emerald)
+          } else if (minDistance < 11.5) {
+            floorColor = '#fef08a'; // Fair / Moderate (Soft Yellow)
+          } else {
+            floorColor = '#fca5a5'; // Dead Zone under standard threshold (Soft Rose)
+          }
+        }
       }
 
       const floorMat = new THREE.MeshStandardMaterial({
@@ -382,7 +423,7 @@ export default function ThreeCanvas({
         roughness: 0.9,
         metalness: 0.05,
         transparent: true,
-        opacity: showOccupancyHeatmap ? 0.75 : 0.65,
+        opacity: (showOccupancyHeatmap || showWifiHeatmap) ? 0.75 : 0.65,
       });
       const floorMesh = new THREE.Mesh(floorGeo, floorMat);
       floorMesh.position.set(room.x, 0.03, room.z);
@@ -416,7 +457,7 @@ export default function ThreeCanvas({
     });
 
     scene.add(roomPlanGroup);
-  }, [rooms, viewMode, assets, showOccupancyHeatmap]);
+  }, [rooms, viewMode, assets, showOccupancyHeatmap, showWifiHeatmap]);
 
   // Helper to construct architectural walls
   function createWallMesh(
@@ -562,11 +603,111 @@ export default function ThreeCanvas({
 
       assetsGroup.add(group);
       meshMap.set(asset.id, group);
+
+      // Render flat concentric radio waves on the floor under Access Points
+      if (showWifiHeatmap && asset.type === 'ap') {
+        const ring1Geo = new THREE.RingGeometry(0, 2.5, 30, 1);
+        const ring1Mat = new THREE.MeshBasicMaterial({
+          color: '#10b981',
+          transparent: true,
+          opacity: 0.1,
+          side: THREE.DoubleSide
+        });
+        const ring1 = new THREE.Mesh(ring1Geo, ring1Mat);
+        ring1.rotation.x = -Math.PI / 2;
+        ring1.position.y = -group.position.y + 0.05;
+        group.add(ring1);
+
+        const ring2Geo = new THREE.RingGeometry(2.5, 6.0, 30, 1);
+        const ring2Mat = new THREE.MeshBasicMaterial({
+          color: '#eab308',
+          transparent: true,
+          opacity: 0.05,
+          side: THREE.DoubleSide
+        });
+        const ring2 = new THREE.Mesh(ring2Geo, ring2Mat);
+        ring2.rotation.x = -Math.PI / 2;
+        ring2.position.y = -group.position.y + 0.05;
+        group.add(ring2);
+
+        const ring3Geo = new THREE.RingGeometry(5.95, 6.05, 30, 1);
+        const ring3Mat = new THREE.MeshBasicMaterial({
+          color: '#f87171',
+          transparent: true,
+          opacity: 0.25,
+          side: THREE.DoubleSide
+        });
+        const ring3 = new THREE.Mesh(ring3Geo, ring3Mat);
+        ring3.rotation.x = -Math.PI / 2;
+        ring3.position.y = -group.position.y + 0.05;
+        group.add(ring3);
+      }
     });
+
+    // Clear and build the Cabling paths overlay group
+    const existingCabling = scene.getObjectByName('CABLING_PATHS_GROUP');
+    if (existingCabling) scene.remove(existingCabling);
+
+    if (showCablingPaths) {
+      const cablingGroup = new THREE.Group();
+      cablingGroup.name = 'CABLING_PATHS_GROUP';
+
+      assets.forEach((asset) => {
+        if (asset.category !== 'infrastructure') return;
+
+        // Skip if active filters currently exclude this element
+        if (activeCategoryFilter !== 'all' && activeCategoryFilter !== 'infrastructure') return;
+        if (activeAssetTypeFilter !== 'all' && asset.type !== activeAssetTypeFilter) return;
+
+        const xA = asset.position.x;
+        const yA = asset.position.y;
+        const zA = asset.position.z;
+
+        const ceilingY = (viewMode === '3D') ? 3.2 : 0.1;
+        const rackY = (viewMode === '3D') ? 1.2 : 0.1;
+
+        // MDF/IDF Network Rack Center in Server Room
+        const rackX = 6.0;
+        const rackZ = 6.8;
+
+        const points = [
+          new THREE.Vector3(xA, yA, zA),
+          new THREE.Vector3(xA, ceilingY, zA),
+          new THREE.Vector3(rackX, ceilingY, rackZ),
+          new THREE.Vector3(rackX, rackY, rackZ),
+        ];
+
+        const pathGeo = new THREE.BufferGeometry().setFromPoints(points);
+
+        let cableColor = '#a855f7'; // Purple/multimedia default
+        if (asset.type === 'ap') {
+          cableColor = '#10b981'; // Green: Cat7 PoE+ High-Speed WLAN
+        } else if (asset.type === 'dp') {
+          cableColor = '#3b82f6'; // Blue: Cat6a LAN Gigabit Link
+        } else if (asset.type === 'tp') {
+          cableColor = '#f97316'; // Orange: Analog Fax/VoIP Voice line
+        } else if (asset.type === 'cctv') {
+          cableColor = '#f59e0b'; // Amber: Cat6 PoE Dome/Bullet Security
+        }
+
+        const pathMat = new THREE.LineDashedMaterial({
+          color: cableColor,
+          dashSize: 0.2,
+          gapSize: 0.1,
+          linewidth: 1.5,
+        });
+
+        const cableLine = new THREE.Line(pathGeo, pathMat);
+        cableLine.computeLineDistances();
+        cablingGroup.add(cableLine);
+      });
+
+      scene.add(cablingGroup);
+    }
 
     scene.add(assetsGroup);
     assetMeshesRef.current = meshMap;
-  }, [assets, rooms, selectedAssetId, activeCategoryFilter, activeAssetTypeFilter, viewMode]);
+  }, [assets, rooms, selectedAssetId, activeCategoryFilter, activeAssetTypeFilter, viewMode, showWifiHeatmap, showCablingPaths]);
 
   // Generates procedurally crafted Three.js geometric items for outstanding interior and low-current fidelity
   function buildProceduralAssetMesh(asset: PlacedAsset, group: THREE.Group) {
@@ -639,6 +780,62 @@ export default function ThreeCanvas({
         break;
       }
 
+      case 'hdmi_port': { // HDMI Port
+        // Deep purple wallplate with gold connector core
+        const plateGeo = new THREE.BoxGeometry(0.35, 0.35, 0.1);
+        const plateMat = new THREE.MeshStandardMaterial({ color: '#7c3aed', roughness: 0.4 });
+        const plate = new THREE.Mesh(plateGeo, plateMat);
+        plate.position.y = 0.175;
+        group.add(plate);
+
+        // Gold plated core
+        const coreGeo = new THREE.BoxGeometry(0.22, 0.14, 0.12);
+        const coreMat = new THREE.MeshStandardMaterial({ 
+          color: '#fbbf24', 
+          metalness: 0.9, 
+          roughness: 0.1,
+          emissive: '#b45309',
+          emissiveIntensity: 0.15 
+        });
+        const core = new THREE.Mesh(coreGeo, coreMat);
+        core.position.set(0, 0.175, 0.01);
+        group.add(core);
+
+        // Dark central connector pin hole
+        const pinGeo = new THREE.BoxGeometry(0.14, 0.06, 0.13);
+        const pinMat = new THREE.MeshStandardMaterial({ color: '#171717', roughness: 0.9 });
+        const pin = new THREE.Mesh(pinGeo, pinMat);
+        pin.position.set(0, 0.175, 0.015);
+        group.add(pin);
+        break;
+      }
+
+      case 'projector_port': { // Projector interface port (VGA or Serial control)
+        // Dark slate plate with double orange / teal outputs representing multi-connection points
+        const plateGeo = new THREE.BoxGeometry(0.4, 0.3, 0.1);
+        const plateMat = new THREE.MeshStandardMaterial({ color: '#334155', roughness: 0.6 });
+        const plate = new THREE.Mesh(plateGeo, plateMat);
+        plate.position.y = 0.15;
+        group.add(plate);
+
+        // Port 1 (Corporate Orange)
+        const port1Geo = new THREE.CylinderGeometry(0.06, 0.06, 0.12, 12);
+        const port1Mat = new THREE.MeshStandardMaterial({ color: '#ea580c', roughness: 0.3 });
+        const port1 = new THREE.Mesh(port1Geo, port1Mat);
+        port1.rotation.x = Math.PI / 2;
+        port1.position.set(-0.1, 0.15, 0.01);
+        group.add(port1);
+
+        // Port 2 (Vibrant Cyan)
+        const port2Geo = new THREE.CylinderGeometry(0.06, 0.06, 0.12, 12);
+        const port2Mat = new THREE.MeshStandardMaterial({ color: '#06b6d4', roughness: 0.3 });
+        const port2 = new THREE.Mesh(port2Geo, port2Mat);
+        port2.rotation.x = Math.PI / 2;
+        port2.position.set(0.1, 0.15, 0.01);
+        group.add(port2);
+        break;
+      }
+
       case 'cctv': { // Security Camera CCTV
         // Detailed dome or hanging camera
         const bracketGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.5, 8);
@@ -661,18 +858,67 @@ export default function ThreeCanvas({
         lens.position.set(0, 0.16, 0.14);
         group.add(lens);
 
-        // Translucent viewing angles cone in 3D mode
+        // Calculate lens properties dynamically from specifications
+        const lensStr = asset.specs?.Lens || asset.specs?.lens || '4.0mm';
+        let actFov = 80 * (Math.PI / 180); // Default 4.0mm lens FOV (80 degrees)
+        let actRadius = 9.0;               // Default coverage range (9 meters)
+
+        if (lensStr.includes('2.8mm')) {
+          actFov = 100 * (Math.PI / 180); // Wide-angle dome lens (100 degrees)
+          actRadius = 6.5;                // Shorter high-detail reach (6.5 meters)
+        } else if (lensStr.includes('6.0mm')) {
+          actFov = 50 * (Math.PI / 180);  // Narrow telephoto lens (50 degrees)
+          actRadius = 14.0;               // Long-distance reach (14.0 meters)
+        }
+
+        // 1. Precise 2D/3D ground coverage area sector wedge (Always visible on floor)
+        // Since group is at height y: 3.2, local y: -3.18 aligns perfectly with the floor (slightly above to avoid z-fighting)
+        const sectorGeo = new THREE.RingGeometry(0, actRadius, 32, 1, -Math.PI / 2 - actFov / 2, actFov);
+        const sectorMat = new THREE.MeshBasicMaterial({
+          color: '#f59e0b', // Warm security amber color scheme
+          transparent: true,
+          opacity: 0.09,    // Soft non-intrusive alpha
+          side: THREE.DoubleSide
+        });
+        const sector = new THREE.Mesh(sectorGeo, sectorMat);
+        sector.rotation.x = -Math.PI / 2;
+        sector.position.y = -3.18;
+        group.add(sector);
+
+        // Add a clean, dashed or high-contrast border on the sector edges to act as an authentic CAD marker
+        const outlineMat = new THREE.MeshBasicMaterial({
+          color: '#fbbf24', // Brighter warning gold
+          transparent: true,
+          opacity: 0.28,
+          side: THREE.DoubleSide,
+          wireframe: true,
+        });
+        const sectorOutline = new THREE.Mesh(sectorGeo, outlineMat);
+        sectorOutline.rotation.x = -Math.PI / 2;
+        sectorOutline.position.y = -3.17;
+        group.add(sectorOutline);
+
+        // 2. Translucent volumetric viewing angle/projection cone in 3D mode
         if (viewMode === '3D') {
-          const coneGeo = new THREE.ConeGeometry(3.5, 5, 16, 1, true);
+          const slantHeight = 3.2 / Math.cos(Math.PI / 4); // Slant distance from 3.2m height camera to ground
+          const coneRadius = slantHeight * Math.tan(actFov / 2);
+          const coneGeo = new THREE.ConeGeometry(coneRadius, slantHeight, 16, 1, true);
+          
+          // Translate geometric center to reposition the cone's apex directly at (0, 0, 0)
+          coneGeo.translate(0, -slantHeight / 2, 0);
+          
           const coneMat = new THREE.MeshBasicMaterial({
             color: '#f59e0b',
             transparent: true,
-            opacity: 0.07,
+            opacity: 0.045, // Exceedingly soft volumetric visual queues
             side: THREE.DoubleSide
           });
           const cone = new THREE.Mesh(coneGeo, coneMat);
-          cone.rotation.x = Math.PI + Math.PI / 4;
-          cone.position.set(0, -1.8, 1.8);
+          
+          // Mount the cone apex exactly on the camera lens
+          cone.position.set(0, 0.16, 0.14);
+          cone.rotation.x = Math.PI / 4; // Align tilt angle downward with the camera body orientation
+          
           group.add(cone);
         }
         break;
@@ -1100,7 +1346,7 @@ export default function ThreeCanvas({
             <div
               key={room.id}
               className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center text-center transition-all duration-150"
-              style={{ left: room.x, top: room.y }}
+              style={{ left: `${room.x}px`, top: `${room.y}px` }}
             >
               <span
                 className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-white/95 text-slate-800 shadow-xs border border-slate-200 select-none pointer-events-none mb-1 inline-block"

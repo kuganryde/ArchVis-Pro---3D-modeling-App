@@ -36,6 +36,8 @@ export default function App() {
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<'all' | 'furniture' | 'infrastructure'>('all');
   const [activeAssetTypeFilter, setActiveAssetTypeFilter] = useState<string | 'all'>('all');
   const [showOccupancyHeatmap, setShowOccupancyHeatmap] = useState(false);
+  const [showWifiHeatmap, setShowWifiHeatmap] = useState(false);
+  const [showCablingPaths, setShowCablingPaths] = useState(false);
 
   // Interactive help tour state
   const [showTutorial, setShowTutorial] = useState(true);
@@ -56,7 +58,7 @@ export default function App() {
     let height = 0.4;
     let defaultSpecs: Record<string, string> = {};
 
-    if (['ap', 'dp', 'tp', 'cctv', 'door_access', 'intercom', 'power_outlet'].includes(type)) {
+    if (['ap', 'dp', 'tp', 'cctv', 'door_access', 'intercom', 'power_outlet', 'hdmi_port', 'projector_port'].includes(type)) {
       category = 'infrastructure';
       height = type === 'ap' || type === 'cctv' ? 3.2 : 0.8; // height parameters
     }
@@ -87,6 +89,24 @@ export default function App() {
           ID: `TP-OW-${nextAssetIdNumberRef.current - 90}`,
           LineNumber: `Ext ${200 + nextAssetIdNumberRef.current - 90}`,
           Type: 'VoIP'
+        };
+        break;
+      case 'hdmi_port':
+        label = `HDMI Port-${nextAssetIdNumberRef.current - 90}`;
+        defaultSpecs = {
+          ID: `HDMI-PORT-${nextAssetIdNumberRef.current - 90}`,
+          Version: 'HDMI 2.1 UHD',
+          Location: 'Wall / Table Grommet',
+          Shielding: 'Gold-Plated Triple'
+        };
+        break;
+      case 'projector_port':
+        label = `Projector Port-${nextAssetIdNumberRef.current - 90}`;
+        defaultSpecs = {
+          ID: `PROJ-PORT-${nextAssetIdNumberRef.current - 90}`,
+          Connection: 'VGA / HDMI Loop',
+          Control: 'RS-232 Serial',
+          Location: 'Wall Faceplate'
         };
         break;
       case 'cctv':
@@ -233,6 +253,89 @@ export default function App() {
     setAssets((prev) =>
       prev.map((a) => (a.assignedRoomId === id ? { ...a, assignedRoomId: undefined } : a))
     );
+  };
+
+  const handleApplyRoomSetupTemplate = (roomId: string, templateType: string) => {
+    const room = rooms.find(r => r.id === roomId);
+    if (!room) return;
+
+    const cx = room.x;
+    const cz = room.z;
+
+    const itemsToAdd: Array<{ type: string; x: number; z: number; rotation?: number; scale?: { x: number; y: number; z: number }; specs?: Record<string, string> }> = [];
+
+    if (templateType === 'boardroom_8') {
+      itemsToAdd.push({
+        type: 'conference_table', 
+        x: cx, 
+        z: cz, 
+        scale: { x: 3.2, y: 0.75, z: 1.4 },
+        specs: { Manufacturer: 'Steelcase', Cost: '$2,400.00', Weight: '240 kg', 'Power Needs': 'Dual AC Core' }
+      });
+      // 8 Chairs surrounding elegantly
+      itemsToAdd.push({ type: 'chair_office', x: cx - 1.2, z: cz - 0.7, rotation: Math.PI });
+      itemsToAdd.push({ type: 'chair_office', x: cx - 0.4, z: cz - 0.7, rotation: Math.PI });
+      itemsToAdd.push({ type: 'chair_office', x: cx + 0.4, z: cz - 0.7, rotation: Math.PI });
+      itemsToAdd.push({ type: 'chair_office', x: cx + 1.2, z: cz - 0.7, rotation: Math.PI });
+      itemsToAdd.push({ type: 'chair_office', x: cx - 1.2, z: cz + 0.7 });
+      itemsToAdd.push({ type: 'chair_office', x: cx - 0.4, z: cz + 0.7 });
+      itemsToAdd.push({ type: 'chair_office', x: cx + 0.4, z: cz + 0.7 });
+      itemsToAdd.push({ type: 'chair_office', x: cx + 1.2, z: cz + 0.7 });
+
+      // Interactive Whiteboard and Low-Current elements
+      itemsToAdd.push({ type: 'whiteboard', x: cx - room.width / 2 + 0.25, z: cz, rotation: Math.PI / 2, specs: { Size: '86-inch 4K', Mounting: 'Wall Fixed' } });
+      itemsToAdd.push({ type: 'ap', x: cx, z: cz, specs: { model: 'Aruba AP-535 Dual', Mac: '55:1A:2B:3C:FE:91', Frequency: 'Dual 5GHz / 2.4GHz' } });
+      itemsToAdd.push({ type: 'hdmi_port', x: cx, z: cz - 0.1, specs: { PortName: 'Table-HDMI-Grid' } });
+      itemsToAdd.push({ type: 'projector_port', x: cx - 1.2, z: cz, specs: { LinkName: 'Ceiling Dropped Line' } });
+    } else if (templateType === 'workstations_4') {
+      itemsToAdd.push({ type: 'desk_cluster_4', x: cx, z: cz, scale: { x: 1.8, y: 0.75, z: 1.4 } });
+      itemsToAdd.push({ type: 'chair_office', x: cx - 0.6, z: cz - 0.6, rotation: Math.PI });
+      itemsToAdd.push({ type: 'chair_office', x: cx + 0.6, z: cz - 0.6, rotation: Math.PI });
+      itemsToAdd.push({ type: 'chair_office', x: cx - 0.6, z: cz + 0.6 });
+      itemsToAdd.push({ type: 'chair_office', x: cx + 0.6, z: cz + 0.6 });
+
+      itemsToAdd.push({ type: 'dp', x: cx - room.width / 2 + 0.15, z: cz, specs: { ID: 'WRK-DP-AG', Port: 'W-03', Status: 'Active' } });
+    } else if (templateType === 'exec_suite') {
+      itemsToAdd.push({ type: 'desk_single', x: cx, z: cz - 0.5 });
+      itemsToAdd.push({ type: 'chair_office', x: cx, z: cz - 1.1 });
+      itemsToAdd.push({ type: 'chair_lounge', x: cx, z: cz + 0.8, scale: { x: 1.5, y: 1.0, z: 1.0 }, rotation: Math.PI });
+
+      itemsToAdd.push({ type: 'whiteboard', x: cx - room.width / 2 + 0.25, z: cz, rotation: Math.PI / 2 });
+      itemsToAdd.push({ type: 'tp', x: cx + room.width / 2 - 0.15, z: cz, specs: { ID: 'TP-EXEC-OW', LineNumber: 'Ext 102' } });
+      itemsToAdd.push({ type: 'cctv', x: cx, z: cz, specs: { model: 'AXIS 360 Mini', Lens: '2.8mm Wide-Angle' } });
+    }
+
+    const newAssetsToAppend: PlacedAsset[] = itemsToAdd.map((item, idx) => {
+      const uid = `${item.type}_${Date.now().toString().slice(-4)}_${Math.floor(Math.random() * 1000 + idx)}`;
+      let category: 'infrastructure' | 'furniture' = 'furniture';
+      const isInfra = ['ap', 'dp', 'tp', 'cctv', 'door_access', 'intercom', 'power_outlet', 'hdmi_port', 'projector_port'].includes(item.type);
+      let height = (item.type === 'ap' || item.type === 'cctv') ? 3.2 : (isInfra ? 0.8 : 0.4);
+
+      if (isInfra) {
+        category = 'infrastructure';
+      }
+
+      return {
+        id: uid,
+        type: item.type as any,
+        category,
+        name: `${item.type.toUpperCase().replace('_', ' ')} (Parametric Group)`,
+        position: { x: item.x, y: height, z: item.z },
+        rotationY: item.rotation || 0,
+        scale: item.scale || { x: 1, y: 1, z: 1 },
+        assignedRoomId: roomId,
+        specs: item.specs || { Manufacturer: 'Standard BIM Family', Cost: '$150.00', Weight: '6 kg' }
+      };
+    });
+
+    setAssets((prev) => [...prev, ...newAssetsToAppend]);
+
+    // Fast feedback notification toast
+    const toast = document.createElement('div');
+    toast.className = "fixed bottom-14 right-5 bg-emerald-600 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-emerald-400 z-50 flex items-center gap-1.5 animate-in slide-in-from-bottom-4 duration-300";
+    toast.innerHTML = `<span>Applied functional setup blueprint! Nested ${newAssetsToAppend.length} specs-loaded nodes into ${room.name}!</span>`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
   };
 
   // Reset CAD workspace to default image specifications
@@ -416,6 +519,8 @@ export default function App() {
             activeCategoryFilter={activeCategoryFilter}
             activeAssetTypeFilter={activeAssetTypeFilter}
             showOccupancyHeatmap={showOccupancyHeatmap}
+            showWifiHeatmap={showWifiHeatmap}
+            showCablingPaths={showCablingPaths}
           />
         </div>
 
@@ -438,6 +543,11 @@ export default function App() {
             onSetViewMode={setViewMode}
             activeTab={activeTab}
             onSetActiveTab={setActiveTab}
+            showWifiHeatmap={showWifiHeatmap}
+            onSetShowWifiHeatmap={setShowWifiHeatmap}
+            showCablingPaths={showCablingPaths}
+            onSetShowCablingPaths={setShowCablingPaths}
+            onApplyRoomSetupTemplate={handleApplyRoomSetupTemplate}
           />
         </div>
 
