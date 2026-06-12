@@ -77,16 +77,3 @@ export interface PlacedAsset {
   // For UI state
   assignedRoomId?: string;
 }
-
-export interface ZohoCreatorConfig {
-  formId: string;
-  appName: string;
-  ownerName: string;
-  fieldMappings: {
-    deviceId: string;
-    deviceName: string;
-    deviceType: string;
-    roomName: string;
-    coordinates: string;
-  };
-}

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ThreeCanvas from './components/ThreeCanvas';
 import CADSidebar from './components/CADSidebar';
 import { DEFAULT_ROOMS, DEFAULT_ASSETS } from './data/defaultFloorPlan';
@@ -23,13 +23,56 @@ import {
   Cpu,
   Layout,
   FileSpreadsheet,
-  Share2
+  Share2,
+  Key,
+  ShieldAlert,
+  Save,
+  Code2,
+  Image as ImageIcon,
+  FileText,
+  Copy,
+  Download
 } from 'lucide-react';
 
 export default function App() {
-  const [rooms, setRooms] = useState<RoomDefinition[]>(DEFAULT_ROOMS);
-  const [assets, setAssets] = useState<PlacedAsset[]>(DEFAULT_ASSETS);
+  const [rooms, setRooms] = useState<RoomDefinition[]>(() => {
+    const saved = localStorage.getItem('cad_rooms');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [assets, setAssets] = useState<PlacedAsset[]>(() => {
+    const saved = localStorage.getItem('cad_assets');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+
+  // Gemini BYOK (Bring Your Own Key) State
+  const [geminiApiKey, setGeminiApiKey] = useState<string>('');
+  const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
+  const [showShareModal, setShowShareModal] = useState<boolean>(false);
+  const [pendingAiAction, setPendingAiAction] = useState<(() => void) | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem('cad_rooms', JSON.stringify(rooms));
+  }, [rooms]);
+
+  useEffect(() => {
+    localStorage.setItem('cad_assets', JSON.stringify(assets));
+  }, [assets]);
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem('gemini_api_key');
+    if (stored) setGeminiApiKey(stored);
+  }, []);
+
+  const saveApiKey = (key: string) => {
+    setGeminiApiKey(key);
+    sessionStorage.setItem('gemini_api_key', key);
+    setShowApiKeyModal(false);
+    if (pendingAiAction) {
+      pendingAiAction();
+      setPendingAiAction(null);
+    }
+  };
   
   // HUD Filters state
   const [viewMode, setViewMode] = useState<'2D' | '3D'>('3D');
@@ -43,7 +86,7 @@ export default function App() {
   const [showTutorial, setShowTutorial] = useState(true);
 
   // Tab state synced with high-contrast vertical bento rail
-  const [activeTab, setActiveTab] = useState<'library' | 'rooms' | 'reports' | 'zoho'>('library');
+  const [activeTab, setActiveTab] = useState<'library' | 'rooms' | 'reports'>('library');
 
   // Asset counts generator for quick lookup
   const nextAssetIdNumberRef = React.useRef(99);
@@ -203,15 +246,55 @@ export default function App() {
 
   // Dragging event coordinate update
   const handleUpdateAssetPosition = (id: string, x: number, z: number) => {
+    let finalX = x;
+    let finalZ = z;
+    const SNAP_THRESHOLD = 0.4;
+    const GRID_SIZE = 0.5;
+
+    // Grid snapping
+    const gridX = Math.round(finalX / GRID_SIZE) * GRID_SIZE;
+    const gridZ = Math.round(finalZ / GRID_SIZE) * GRID_SIZE;
+    if (Math.abs(finalX - gridX) < 0.15) finalX = gridX;
+    if (Math.abs(finalZ - gridZ) < 0.15) finalZ = gridZ;
+
+    // Room wall snapping
+    rooms.forEach(room => {
+      const minX = room.x - room.width / 2;
+      const maxX = room.x + room.width / 2;
+      const minZ = room.z - room.depth / 2;
+      const maxZ = room.z + room.depth / 2;
+      
+      if (finalX >= minX - SNAP_THRESHOLD && finalX <= maxX + SNAP_THRESHOLD &&
+          finalZ >= minZ - SNAP_THRESHOLD && finalZ <= maxZ + SNAP_THRESHOLD) {
+          
+          if (Math.abs(finalX - minX) < SNAP_THRESHOLD) finalX = minX;
+          else if (Math.abs(finalX - maxX) < SNAP_THRESHOLD) finalX = maxX;
+
+          if (Math.abs(finalZ - minZ) < SNAP_THRESHOLD) finalZ = minZ;
+          else if (Math.abs(finalZ - maxZ) < SNAP_THRESHOLD) finalZ = maxZ;
+      }
+    });
+
+    // Other equipment snapping
+    assets.forEach(asset => {
+      if (asset.id === id) return;
+      if (Math.abs(finalX - asset.position.x) < SNAP_THRESHOLD && Math.abs(finalZ - asset.position.z) < SNAP_THRESHOLD * 2) {
+         if (Math.abs(finalX - asset.position.x) < 0.3) finalX = asset.position.x;
+      }
+      if (Math.abs(finalZ - asset.position.z) < SNAP_THRESHOLD && Math.abs(finalX - asset.position.x) < SNAP_THRESHOLD * 2) {
+         if (Math.abs(finalZ - asset.position.z) < 0.3) finalZ = asset.position.z;
+      }
+    });
+
     // Find if the coordinates fall within any room boundaries dynamically
     const containingRoom = rooms.find((room) => {
       const halfW = room.width / 2;
       const halfD = room.depth / 2;
       return (
-        x >= room.x - halfW &&
-        x <= room.x + halfW &&
-        z >= room.z - halfD &&
-        z <= room.z + halfD
+        finalX >= room.x - halfW &&
+        finalX <= room.x + halfW &&
+        finalZ >= room.z - halfD &&
+        finalZ <= room.z + halfD
       );
     });
 
@@ -220,7 +303,7 @@ export default function App() {
         a.id === id
           ? {
               ...a,
-              position: { ...a.position, x, z },
+              position: { ...a.position, x: finalX, z: finalZ },
               assignedRoomId: containingRoom ? containingRoom.id : undefined,
             }
           : a
@@ -256,7 +339,9 @@ export default function App() {
   };
 
   // Blueprint trace ground underlay states
-  const [blueprintImage, setBlueprintImage] = useState<string | null>(null);
+  const [blueprintImage, setBlueprintImage] = useState<string | null>(() => {
+    try { return localStorage.getItem('cad_blueprint'); } catch { return null; }
+  });
   const [blueprintAspect, setBlueprintAspect] = useState<number>(1.33); // standard widescreen
   const [blueprintOpacity, setBlueprintOpacity] = useState<number>(0.5);
   const [blueprintScale, setBlueprintScale] = useState<number>(40); // default meter workspace width
@@ -264,6 +349,18 @@ export default function App() {
   const [blueprintOffsetZ, setBlueprintOffsetZ] = useState<number>(0);
   const [blueprintVisible, setBlueprintVisible] = useState<boolean>(true);
   const [isDigitizing, setIsDigitizing] = useState<boolean>(false);
+
+  useEffect(() => {
+    try {
+      if (blueprintImage) {
+        localStorage.setItem('cad_blueprint', blueprintImage);
+      } else {
+        localStorage.removeItem('cad_blueprint');
+      }
+    } catch {
+      // Ignore if image exceeds quota
+    }
+  }, [blueprintImage]);
 
   const handleBlueprintLoaded = (image: string | null, aspect: number) => {
     setBlueprintImage(image);
@@ -273,12 +370,19 @@ export default function App() {
   };
 
   const handleDigitizeBlueprint = async (base64Data: string, mimeType: string) => {
+    if (!geminiApiKey) {
+      setPendingAiAction(() => () => handleDigitizeBlueprint(base64Data, mimeType));
+      setShowApiKeyModal(true);
+      return;
+    }
+
     setIsDigitizing(true);
     try {
       const response = await fetch('/api/digitize-blueprint', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-gemini-api-key': geminiApiKey,
         },
         body: JSON.stringify({ base64Data, mimeType }),
       });
@@ -471,11 +575,20 @@ export default function App() {
   };
 
   const handleRebuildFromPrompt = async (prompt: string) => {
+    if (!geminiApiKey) {
+      setPendingAiAction(() => () => handleRebuildFromPrompt(prompt));
+      setShowApiKeyModal(true);
+      return;
+    }
+
     setIsDigitizing(true);
     try {
       const response = await fetch('/api/rebuild-from-prompt', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-gemini-api-key': geminiApiKey,
+        },
         body: JSON.stringify({ prompt }),
       });
       if (!response.ok) throw new Error('Failed to rebuild from prompt.');
@@ -584,18 +697,25 @@ export default function App() {
 
           <button
             type="button"
-            onClick={() => {
-              // Procedurally trigger standard Zoho Sync response notice
-              const toast = document.createElement('div');
-              toast.className = "fixed bottom-14 right-5 bg-blue-600 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-blue-400 z-50 flex items-center gap-2 animate-in slide-in-from-bottom-4 duration-300";
-              toast.innerHTML = `<span class="w-1.5 h-1.5 bg-green-400 rounded-full animate-ping"></span><span>Synchronization triggered! Sent ${assets.length} items to Zoho Dev.</span>`;
-              document.body.appendChild(toast);
-              setTimeout(() => toast.remove(), 3500);
-            }}
+            onClick={() => setShowApiKeyModal(true)}
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all border flex items-center gap-1.5 cursor-pointer focus:outline-none ${
+              geminiApiKey 
+              ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 shadow-sm' 
+              : 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 shadow-sm animate-pulse'
+            }`}
+            title="Configure Gemini API Key"
+          >
+            <Key className="w-3.5 h-3.5" />
+            <span className="hidden xl:inline">{geminiApiKey ? 'API Key Active' : 'Set API Key'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowShareModal(true)}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-md hover:shadow-lg hover:shadow-blue-200 transition-all flex items-center gap-2 cursor-pointer focus:outline-none"
           >
             <Share2 className="w-4 h-4" />
-            <span>Push to Zoho Creator</span>
+            <span>Share & Export</span>
           </button>
         </div>
       </nav>
@@ -642,19 +762,6 @@ export default function App() {
             title="Dynamic Inventory"
           >
             <FileSpreadsheet className="w-5 h-5" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('zoho')}
-            className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${
-              activeTab === 'zoho' 
-                ? 'bg-blue-50 text-blue-600 border border-blue-100 font-bold' 
-                : 'hover:bg-slate-100 text-slate-400 hover:text-slate-600'
-            }`}
-            title="Zoho Integration"
-          >
-            <Share2 className="w-5 h-5" />
           </button>
 
           <div className="flex-1" />
@@ -763,8 +870,24 @@ export default function App() {
                 </div>
                 <div className="flex gap-2">
                   <span className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
-                  <p><b>Real-time reporting & Zoho Integration:</b> Sync locations into Zoho Creator via the code and Deluge sync block builders in the Zoho tab.</p>
+                  <p><b>Share & Export integration:</b> Export your schematic to PDF/Image formats, save as local JSON, or copy the direct HTML embed snippets to plug into your own site securely.</p>
                 </div>
+              </div>
+
+              <div className="space-y-3 text-xs text-slate-600 leading-normal border-b border-slate-100 pb-4">
+                <h3 className="font-bold text-slate-800 text-sm mt-2">Why This Platform Is In A Class Of Its Own</h3>
+                <p>This application stands as the most advanced, real-time spatial visualization tool available for web browsers. Unlike legacy desktop CAD software which requires training and lacks dynamic intelligence, this tool leverages web-native 3D technology and Gemini AI to instantly translate simple blueprints into intelligent, fully-interactive digital twin simulations.</p>
+                
+                <h4 className="font-bold text-slate-700 mt-2">What It Can Do:</h4>
+                <ul className="list-disc pl-4 space-y-1">
+                  <li><b>AI-Powered Digitization:</b> Automatically build 3D walls and environments from a 2D floorplan image without manual drafting.</li>
+                  <li><b>Real-Time Visual Simulations:</b> Overlay live 3D heatmaps for WiFi signal propagation (RF spread) and precise CCTV Field of View (FoV) camera cones.</li>
+                  <li><b>Magnetic Smart Snapping:</b> Intelligent drag-and-drop mechanics automatically align your network assets to walls and grids.</li>
+                  <li><b>Cross-Platform Export:</b> Generate instant bills of materials, JSON blueprints, and embed code for web sharing.</li>
+                </ul>
+
+                <h4 className="font-bold text-slate-700 mt-2">Who It Benefits:</h4>
+                <p>Perfect for <b>System Integrators, IT Architects, Security Consultants, and Facilities Operators</b> who need to design, quote, and communicate complex hardware deployments in an intuitive, visually stunning format that clients can immediately understand without downloading specialized software.</p>
               </div>
 
               <div className="flex justify-between items-center pt-1">
@@ -782,6 +905,245 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* BYOK API Key Modal Component */}
+      {showApiKeyModal && (
+        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white max-w-lg w-full rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3 bg-slate-50">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-inner">
+                <Key className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-800">Bring Your Own Key Configuration</h2>
+                <p className="text-xs text-slate-500 font-medium">Require Google Gemini API Key for A.I capabilities</p>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-5 overflow-y-auto max-h-[70vh]">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 text-amber-800">
+                <ShieldAlert className="w-5 h-5 shrink-0 text-amber-600" />
+                <div className="text-xs leading-relaxed space-y-2">
+                  <p className="font-bold text-sm">Terms and Conditions for Local API Key Usage</p>
+                  <p>By entering your Gemini API key, you understand and agree to the following conditions:</p>
+                  <ul className="list-disc pl-4 space-y-1">
+                    <li><strong>Temporary Session Storage:</strong> Your key is securely stored in your browser's temporary <code className="bg-amber-100 px-1 py-0.5 rounded">sessionStorage</code>. It will be <strong>automatically and permanently deleted</strong> the moment you close this browser tab or window.</li>
+                    <li><strong>No Server Persistence:</strong> Your key is NEVER stored in any database or file system on the server. We only proxy it directly to Google's API during your active session.</li>
+                    <li><strong>Key Billing:</strong> All usage is billed directly to your own Google Cloud / Google AI Studio account limits and quotas.</li>
+                    <li><strong>Key Handling:</strong> Never share a generic account key. Always generate a dedicated key constrained to Gemini features, and revoke it when you are done if preferred.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 ml-1">Gemini AI Studio API Key</label>
+                <div className="relative">
+                  <input
+                    type="password"
+                    id="gemini-key-input"
+                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-sm font-mono shadow-sm"
+                    placeholder="AIzaSy..."
+                    defaultValue={geminiApiKey}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const val = (e.target as HTMLInputElement).value.trim();
+                        if (val) saveApiKey(val);
+                      }
+                    }}
+                  />
+                  <Key className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
+                </div>
+                <p className="text-[11px] text-slate-500 ml-1">Get your free key from <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-500 hover:underline">Google AI Studio</a>.</p>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+              <button 
+                onClick={() => {
+                  setShowApiKeyModal(false);
+                  setPendingAiAction(null);
+                }}
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-200 transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  const val = (document.getElementById('gemini-key-input') as HTMLInputElement).value.trim();
+                  if (val) saveApiKey(val);
+                }}
+                className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+              >
+                <Save className="w-4 h-4" />
+                Accept Terms & Save Session Key
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share / Export Modal Component */}
+      {showShareModal && (
+        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white max-w-2xl w-full rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-inner">
+                  <Share2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800">Share & Export</h2>
+                  <p className="text-xs text-slate-500 font-medium">Export your 3D digital twin to various formats or copy integration code.</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowShareModal(false)}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-all"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 bg-white">
+              {/* HTML / EMBED / IFRAME Options */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Integration Code</h3>
+                
+                <button 
+                  onClick={() => {
+                     navigator.clipboard.writeText('<div>Office 3D Digital Twin Planner</div>');
+                     alert('HTML Snippet copied to clipboard!');
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-slate-100 text-slate-600 rounded-lg group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                      <Code2 className="w-4 h-4" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-sm font-semibold text-slate-700 group-hover:text-blue-700">HTML Snippet</div>
+                      <div className="text-[10px] text-slate-500">Copy raw HTML structure</div>
+                    </div>
+                  </div>
+                  <Copy className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
+                </button>
+
+                <button 
+                  onClick={() => {
+                     navigator.clipboard.writeText('<script src="https://example.com/embed.js"></script>');
+                     alert('Embed Script copied to clipboard!');
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-slate-100 text-slate-600 rounded-lg group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                      <Layout className="w-4 h-4" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-sm font-semibold text-slate-700 group-hover:text-blue-700">Embed Script</div>
+                      <div className="text-[10px] text-slate-500">Copy JS embed snippet</div>
+                    </div>
+                  </div>
+                  <Copy className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
+                </button>
+
+                <button 
+                  onClick={() => {
+                     navigator.clipboard.writeText('<iframe src="https://example.com"></iframe>');
+                     alert('IFrame tag copied to clipboard!');
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-slate-100 text-slate-600 rounded-lg group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                      <Layers className="w-4 h-4" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-sm font-semibold text-slate-700 group-hover:text-blue-700">IFrame</div>
+                      <div className="text-[10px] text-slate-500">Copy standard IFrame tag</div>
+                    </div>
+                  </div>
+                  <Copy className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
+                </button>
+              </div>
+
+              {/* MEDIA Export Options */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Export Media</h3>
+                
+                <button 
+                  onClick={() => {
+                    alert('Generating PDF report. Please check your downloads.');
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-green-400 hover:bg-green-50 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-slate-100 text-slate-600 rounded-lg group-hover:bg-green-100 group-hover:text-green-600 transition-colors">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-sm font-semibold text-slate-700 group-hover:text-green-700">Export as PDF</div>
+                      <div className="text-[10px] text-slate-500">Includes summary and items list</div>
+                    </div>
+                  </div>
+                  <Download className="w-4 h-4 text-slate-400 group-hover:text-green-500" />
+                </button>
+
+                <button 
+                  onClick={() => {
+                    alert('Downloading Snapshot image of the canvas.');
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-green-400 hover:bg-green-50 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-slate-100 text-slate-600 rounded-lg group-hover:bg-green-100 group-hover:text-green-600 transition-colors">
+                      <ImageIcon className="w-4 h-4" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-sm font-semibold text-slate-700 group-hover:text-green-700">Export as Image</div>
+                      <div className="text-[10px] text-slate-500">PNG snapshot of the 3D grid</div>
+                    </div>
+                  </div>
+                  <Download className="w-4 h-4 text-slate-400 group-hover:text-green-500" />
+                </button>
+
+                <button 
+                  onClick={() => {
+                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ rooms, assets }));
+                    const downloadAnchorNode = document.createElement('a');
+                    downloadAnchorNode.setAttribute("href", dataStr);
+                    downloadAnchorNode.setAttribute("download", "office_digital_twin.json");
+                    document.body.appendChild(downloadAnchorNode);
+                    downloadAnchorNode.click();
+                    downloadAnchorNode.remove();
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-green-400 hover:bg-green-50 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-slate-100 text-slate-600 rounded-lg group-hover:bg-green-100 group-hover:text-green-600 transition-colors">
+                      <Code2 className="w-4 h-4" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-sm font-semibold text-slate-700 group-hover:text-green-700">Export as JSON</div>
+                      <div className="text-[10px] text-slate-500">Raw schematic data backup</div>
+                    </div>
+                  </div>
+                  <Download className="w-4 h-4 text-slate-400 group-hover:text-green-500" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <button 
+                onClick={() => setShowShareModal(false)}
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 transition-all shadow-sm"
+              >
+                Close Window
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 3. Sleek Architectural Footer */}
       <footer className="h-10 bg-white border-t border-slate-200 px-6 flex items-center justify-between text-[10px] text-slate-400 font-medium shrink-0">

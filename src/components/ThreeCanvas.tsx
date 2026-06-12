@@ -1278,13 +1278,15 @@ export default function ThreeCanvas({
         // Selected!
         onSelectAsset(matchedId);
 
-        // Prep the raycasting drag plane
-        isDraggingRef.current = true;
-        draggedAssetIdRef.current = matchedId;
-        controlsRef.current!.enabled = false; // suspend camera orientation changes during drags
+        if (viewMode === '2D') {
+          // Prep the raycasting drag plane
+          isDraggingRef.current = true;
+          draggedAssetIdRef.current = matchedId;
+          controlsRef.current!.enabled = false; // suspend camera orientation changes during drags
 
-        const intersectionPoint = intersects[0].point;
-        dragPlaneRef.current.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), intersectionPoint);
+          const intersectionPoint = intersects[0].point;
+          dragPlaneRef.current.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), intersectionPoint);
+        }
         return;
       }
     }

@@ -3,6 +3,8 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
+import crypto from "crypto";
+import rateLimit from "express-rate-limit";
 
 dotenv.config();
 
@@ -13,11 +15,29 @@ const PORT = 3000;
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+// Apply strict rate limiting on API endpoints to prevent token abuse
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // Limit each IP to 20 requests per `window` (here, per 15 minutes)
+  message: { error: "Too many requests from this IP, please try again after 15 minutes." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use("/api/", apiLimiter);
+
+// In-process memoization cache map
+const responseCache = new Map<string, string>();
+
+const generateCacheKey = (prompt: string, base64Data: string) => {
+  return crypto.createHash("sha256").update(prompt + base64Data).digest("hex");
+};
+
 // Initialize Gemini SDK with recommended AI Studio headers
-const getGeminiClient = () => {
-  const apiKey = process.env.GEMINI_API_KEY;
+const getGeminiClient = (clientKey?: string) => {
+  const apiKey = clientKey || process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.warn("Warning: GEMINI_API_KEY environment variable is not set. AI features might be restricted.");
+    console.warn("Warning: GEMINI_API_KEY is not set and no client key was provided. AI features might be restricted.");
     return null;
   }
   return new GoogleGenAI({
@@ -35,8 +55,8 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Robust function with attempt retries and model fallback
 const queryGeminiWithRetry = async (ai: any, imagePart: any, prompt: string) => {
-  // We prioritize gemini-3.5-flash, and fall back to gemini-3.1-flash-lite if the first model is unavailable.
-  const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite"];
+  // We prioritize gemini-2.0-flash, and fall back to gemini-2.5-flash and gemini-1.5-flash to avoid 503 errors on bleeding edge models.
+  const modelsToTry = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-3.5-flash", "gemini-1.5-pro", "gemini-3.1-flash-lite"];
   let lastError: any = null;
 
   for (const model of modelsToTry) {
@@ -49,6 +69,7 @@ const queryGeminiWithRetry = async (ai: any, imagePart: any, prompt: string) => 
           contents: [imagePart, { text: prompt }],
           config: {
             responseMimeType: "application/json",
+            maxOutputTokens: 2000, // Enforce strict token limits to prevent abuse
             responseSchema: {
               type: Type.OBJECT,
               required: ["rooms", "assets"],
@@ -122,10 +143,11 @@ app.post("/api/digitize-blueprint", async (req, res) => {
       return res.status(400).json({ error: "Missing base64Data of the blueprint file." });
     }
 
-    const ai = getGeminiClient();
+    const clientKey = req.headers['x-gemini-api-key'] as string;
+    const ai = getGeminiClient(clientKey);
     if (!ai) {
       return res.status(503).json({
-        error: "Gemini API Client is uninitialized. Please configure your GEMINI_API_KEY inside Settings > Secrets."
+        error: "Gemini API Key is required. Please provide it in the UI."
       });
     }
 
@@ -189,9 +211,16 @@ app.post("/api/digitize-blueprint", async (req, res) => {
     };
 
     // Query Gemini using our robust multi-attempt retry query wrapper
+    const cacheKey = generateCacheKey(prompt, base64Data);
+    if (responseCache.has(cacheKey)) {
+      console.log('AI Digitizer: Returning from memory cache.');
+      return res.json(JSON.parse(responseCache.get(cacheKey)!));
+    }
+
     const response = await queryGeminiWithRetry(ai, imagePart, prompt);
 
     const parsedData = JSON.parse(response.text || "{}");
+    responseCache.set(cacheKey, JSON.stringify(parsedData));
     return res.json(parsedData);
   } catch (error: any) {
     console.error("Error digitizing floorplan error endpoint:", error);
@@ -205,24 +234,46 @@ app.post("/api/rebuild-from-prompt", async (req, res) => {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ error: "No prompt provided." });
     
-    const ai = getGeminiClient();
-    if (!ai) return res.status(503).json({ error: "AI service uninitialized." });
+    const clientKey = req.headers['x-gemini-api-key'] as string;
+    const ai = getGeminiClient(clientKey);
+    if (!ai) return res.status(503).json({ error: "Gemini API Key is required. Please provide it in the UI." });
 
     const instructions = `
       You are an expert AI Architect. Create a building layout from this prompt: "${prompt}".
       Follow the exact schema as the digitization tool: return a JSON object with 'rooms' and 'assets' arrays.
     `;
     
-    // Using a direct call for text as it's less prone to high demand
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: [{ text: instructions }],
-      config: {
-        responseMimeType: "application/json",
-      }
-    });
+    const cacheKey = generateCacheKey(instructions, "text-prompt");
+    if (responseCache.has(cacheKey)) {
+      console.log('AI Digitizer: Returning rebuild from memory cache.');
+      return res.json(JSON.parse(responseCache.get(cacheKey)!));
+    }
 
-    return res.json(JSON.parse(response.text || "{}"));
+    // Using a direct call for text as it's less prone to high demand
+    const modelsToTry = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-3.5-flash"];
+    let responseText = "{}";
+    
+    for (const model of modelsToTry) {
+      try {
+        console.log(`Rebuilding text prompt with model ${model}...`);
+        const response = await ai.models.generateContent({
+          model,
+          contents: [{ text: instructions }],
+          config: {
+            responseMimeType: "application/json",
+            maxOutputTokens: 2000,
+          }
+        });
+        responseText = response.text || "{}";
+        break;
+      } catch (error: any) {
+        console.warn(`Model ${model} failed for rebuild:`, error.message);
+      }
+    }
+
+    const parsedData = JSON.parse(responseText);
+    responseCache.set(cacheKey, JSON.stringify(parsedData));
+    return res.json(parsedData);
   } catch (error: any) {
     console.error("Error rebuilding from prompt:", error);
     return res.status(500).json({ error: error.message });

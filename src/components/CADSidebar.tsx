@@ -9,7 +9,8 @@ import {
   Share2, 
   Plus, 
   Trash2, 
-  RotateCw, 
+  RotateCw,
+  RotateCcw,
   Search, 
   SlidersHorizontal,
   Info,
@@ -21,7 +22,8 @@ import {
   FileImage,
   Upload,
   Settings,
-  MessageSquare
+  MessageSquare,
+  Save
 } from 'lucide-react';
 import { PlacedAsset, RoomDefinition, ZohoCreatorConfig, getAssetHeightLayer } from '../types';
 
@@ -127,8 +129,8 @@ interface CADSidebarProps {
   onSetAssetTypeFilter: (type: string | 'all') => void;
   viewMode: '2D' | '3D';
   onSetViewMode: (mode: '2D' | '3D') => void;
-  activeTab: 'library' | 'rooms' | 'reports' | 'zoho';
-  onSetActiveTab: (tab: 'library' | 'rooms' | 'reports' | 'zoho') => void;
+  activeTab: 'library' | 'rooms' | 'reports';
+  onSetActiveTab: (tab: 'library' | 'rooms' | 'reports') => void;
   showWifiHeatmap: boolean;
   onSetShowWifiHeatmap: (v: boolean) => void;
   showCablingPaths: boolean;
@@ -320,22 +322,6 @@ export default function CADSidebar({
   const [filterTypeSelector, setFilterTypeSelector] = useState('all');
   const [customParamName, setCustomParamName] = useState('');
 
-  // Zoho details state
-  const [copiedText, setCopiedText] = useState(false);
-  const [copiedDeluge, setCopiedDeluge] = useState(false);
-  const [zohoConfig, setZohoConfig] = useState<ZohoCreatorConfig>({
-    formId: 'Device_Audit_Form',
-    appName: 'Office_IT_Suite',
-    ownerName: 'rydetech_admin',
-    fieldMappings: {
-      deviceId: 'Device_ID_Field',
-      deviceName: 'Device_Name_Field',
-      deviceType: 'Category_Field',
-      roomName: 'Location_Room_Field',
-      coordinates: 'XY_Coordinates',
-    }
-  });
-
   // Library Items catalog
   const libraryCatalog = [
     { type: 'ap', category: 'infrastructure', label: 'Access Point (AP)', count: 12, desc: 'Dual-band transmitter AP-535 router ceiling nodes.' },
@@ -370,54 +356,6 @@ export default function CADSidebar({
     hdmi: assets.filter(a => a.type === 'hdmi_port').length,
     projector: assets.filter(a => a.type === 'projector_port').length,
     furniture: assets.filter(a => a.category === 'furniture').length,
-  };
-
-  const handleCopyIFrameCode = () => {
-    const iframeSnippet = `<iframe 
-  src="${window.location.origin}/?viewMode=${viewMode}&activeCategory=${activeCategoryFilter}&embed=true" 
-  width="100%" 
-  height="680px" 
-  style="border: 2px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);"
-  allow="camera; microphone; geolocation"
-></iframe>`;
-    navigator.clipboard.writeText(iframeSnippet);
-    setCopiedText(true);
-    setTimeout(() => setCopiedText(false), 2500);
-  };
-
-  const handleCopyDelugeCode = () => {
-    const delugeSnippet = `// Zoho Deluge Script to synchronize Office 3D Floor planner device inventories with Zoho CRM/Creator
-void syncDeviceCoordinates_FromFloorPlanner(map deviceDataMap) {
-    deviceId = deviceDataMap.get("id");
-    deviceName = deviceDataMap.get("name");
-    deviceType = deviceDataMap.get("type");
-    coords_x = deviceDataMap.get("position_x");
-    coords_z = deviceDataMap.get("position_z");
-    assignedRoom = deviceDataMap.get("roomName");
-    
-    // Queries existing Creator records or updates them
-    existingRecord = Zoho_Creator_Forms_Report[${zohoConfig.fieldMappings.deviceId} == deviceId];
-    if(existingRecord.count() > 0) {
-        updateRecord = existingRecord.first();
-        updateRecord.${zohoConfig.fieldMappings.deviceName} = deviceName;
-        updateRecord.${zohoConfig.fieldMappings.deviceType} = deviceType;
-        updateRecord.${zohoConfig.fieldMappings.roomName} = assignedRoom;
-        updateRecord.${zohoConfig.fieldMappings.coordinates} = coords_x.toString() + "," + coords_z.toString();
-        info "Device updated successfully in Zoho Creator ID: " + deviceId;
-    } else {
-        insertRecord = insert into ${zohoConfig.formId} [
-            ${zohoConfig.fieldMappings.deviceId} : deviceId,
-            ${zohoConfig.fieldMappings.deviceName} : deviceName,
-            ${zohoConfig.fieldMappings.deviceType} : deviceType,
-            ${zohoConfig.fieldMappings.roomName} : assignedRoom,
-            ${zohoConfig.fieldMappings.coordinates} : coords_x.toString() + "," + coords_z.toString()
-        ];
-        info "New Device added to Zoho Creator Database.";
-    }
-}`;
-    navigator.clipboard.writeText(delugeSnippet);
-    setCopiedDeluge(true);
-    setTimeout(() => setCopiedDeluge(false), 2500);
   };
 
   // Export CAD structures in JSON format compatible with webhooks/reporting databases
@@ -538,16 +476,6 @@ void syncDeviceCoordinates_FromFloorPlanner(map deviceDataMap) {
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>Inventory</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onSetActiveTab('zoho')}
-            className={`flex-1 py-2 text-center rounded-lg flex items-center justify-center gap-1.5 transition-all text-slate-505 hover:text-slate-900 cursor-pointer ${
-              activeTab === 'zoho' ? 'bg-white shadow-xs text-blue-600 font-bold border border-slate-200/40' : ''
-            }`}
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            <span>Zoho</span>
           </button>
         </div>
 
@@ -763,7 +691,15 @@ void syncDeviceCoordinates_FromFloorPlanner(map deviceDataMap) {
                   <button onClick={onResetCanvas} className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-slate-200 hover:border-red-300 hover:bg-red-50 text-slate-600 hover:text-red-700 text-xs font-bold transition-all shadow-xs">
                     <Trash2 className="w-3.5 h-3.5"/> Blank Canvas
                   </button>
-                  <label className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 text-xs font-bold transition-all shadow-xs cursor-pointer">
+                  <button 
+                    onClick={() => {
+                      alert('Canvas auto-saves, but a manual save to browser local storage is successful!');
+                    }} 
+                    className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 text-xs font-bold transition-all shadow-xs"
+                  >
+                    <Save className="w-3.5 h-3.5"/> Save to Browser
+                  </button>
+                  <label className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 text-xs font-bold transition-all shadow-xs cursor-pointer col-span-2">
                     <Database className="w-3.5 h-3.5"/> Import JSON
                     <input type="file" accept=".json" onChange={async (e) => {
                       const file = e.target.files?.[0];
@@ -1292,126 +1228,6 @@ void syncDeviceCoordinates_FromFloorPlanner(map deviceDataMap) {
               </div>
             </div>
           )}
-
-          {/* ==================== ZOHO CREATOR TAB ==================== */}
-          {activeTab === 'zoho' && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="bg-blue-50 p-3.5 rounded-xl border border-blue-100 flex flex-col gap-2 font-sans">
-                <div className="flex items-start gap-2.5">
-                  <div className="p-1.5 rounded-lg bg-blue-105 text-blue-700 mt-0.5 shrink-0">
-                    <Info className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Zoho Creator Platform Integration</h4>
-                    <p className="text-[11px] text-slate-500 leading-normal mt-1 font-medium">
-                      Configure your cloud-hosted database fields to synchronize physical equipment locations in real-time. Code bindings are updated instantly.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Zoho Creator config form mappings */}
-              <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/40 space-y-3 font-sans">
-                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest font-mono">Creator API Field Mappings</h3>
-                
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-bold text-slate-404 block font-mono">Zoho Form ID</label>
-                    <input
-                      type="text"
-                      value={zohoConfig.formId}
-                      onChange={(e) => setZohoConfig({ ...zohoConfig, formId: e.target.value })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-mono text-slate-700 focus:border-blue-500 focus:outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-bold text-slate-404 block font-mono">Device ID Field</label>
-                    <input
-                      type="text"
-                      value={zohoConfig.fieldMappings.deviceId}
-                      onChange={(e) => setZohoConfig({
-                        ...zohoConfig,
-                        fieldMappings: { ...zohoConfig.fieldMappings, deviceId: e.target.value }
-                      })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-mono text-slate-700 focus:border-blue-500 focus:outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-bold text-slate-404 block font-mono">Device Name Field</label>
-                    <input
-                      type="text"
-                      value={zohoConfig.fieldMappings.deviceName}
-                      onChange={(e) => setZohoConfig({
-                        ...zohoConfig,
-                        fieldMappings: { ...zohoConfig.fieldMappings, deviceName: e.target.value }
-                      })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-mono text-slate-700 focus:border-blue-500 focus:outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-bold text-slate-404 block font-mono">Room Location Field</label>
-                    <input
-                      type="text"
-                      value={zohoConfig.fieldMappings.roomName}
-                      onChange={(e) => setZohoConfig({
-                        ...zohoConfig,
-                        fieldMappings: { ...zohoConfig.fieldMappings, roomName: e.target.value }
-                      })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-mono text-slate-700 focus:border-blue-500 focus:outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Embedded IFrame Copy block */}
-              <div className="space-y-2 font-sans">
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">1. CRM Embed IFrame</label>
-                  <span className="text-[9px] text-slate-400 font-mono">HTML Integration</span>
-                </div>
-
-                <div className="p-3 border border-slate-200 bg-slate-50 rounded-xl text-[10.5px] font-mono text-slate-605 relative group overflow-x-auto select-all max-h-[110px]">
-                  {`<iframe src="${window.location.origin}/?embed=true" width="100%" height="600" style="border:none;"></iframe>`}
-                  <button
-                    type="button"
-                    onClick={handleCopyIFrameCode}
-                    className="absolute right-2 top-2 px-2.5 py-1 rounded-md bg-white border border-slate-200 hover:bg-slate-50 shadow-xs text-[9px] font-bold text-slate-700 cursor-pointer transition-all"
-                  >
-                    {copiedText ? 'Copied!' : 'Copy'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Deluge automation script */}
-              <div className="space-y-2 font-sans">
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">2. Zoho Deluge Sync Script</label>
-                  <span className="text-[9px] text-slate-400 font-mono">API Automation</span>
-                </div>
-
-                <div className="p-3 border border-slate-200 bg-slate-50 rounded-xl text-[10px] font-mono text-blue-600 relative group overflow-y-auto max-h-[140px] feedback-scrollable">
-                  <pre className="text-left select-all whitespace-pre text-slate-605 leading-tight">
-                    {`// Sync CAD layout node coordinate points
-void syncOfficeLayout(map data) {
-  id = data.get("id");
-  x = data.get("x");
-  z = data.get("z");
-  r = data.get("room");
-  input.${zohoConfig.fieldMappings.roomName} = r;
-  input.${zohoConfig.fieldMappings.coordinates} = x + "," + z;
-}`}
-                  </pre>
-                  <button
-                    type="button"
-                    onClick={handleCopyDelugeCode}
-                    className="absolute right-2 top-2 px-2.5 py-1 rounded-md bg-white border border-slate-200 hover:bg-slate-50 shadow-xs text-[9px] font-bold text-slate-700 cursor-pointer transition-all"
-                  >
-                    {copiedDeluge ? 'Copied!' : 'Copy Script'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -1497,11 +1313,22 @@ void syncOfficeLayout(map data) {
                   <button
                     type="button"
                     onClick={() => {
+                      const snap = (selectedAsset.rotationY - Math.PI / 4 + Math.PI * 2) % (Math.PI * 2);
+                      onUpdateAssetSpecs(selectedAsset.id, selectedAsset.specs || {}, selectedAsset.name, snap, selectedAsset.assignedRoomId);
+                    }}
+                    className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-700 shadow-xs transition-all cursor-pointer"
+                    title="Rotate -45° snaps"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
                       const snap = (selectedAsset.rotationY + Math.PI / 4) % (Math.PI * 2);
                       onUpdateAssetSpecs(selectedAsset.id, selectedAsset.specs || {}, selectedAsset.name, snap, selectedAsset.assignedRoomId);
                     }}
                     className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-700 shadow-xs transition-all cursor-pointer"
-                    title="Rotate 45° snaps"
+                    title="Rotate +45° snaps"
                   >
                     <RotateCw className="w-3.5 h-3.5" />
                   </button>
