@@ -35,14 +35,8 @@ import {
 } from 'lucide-react';
 
 export default function App() {
-  const [rooms, setRooms] = useState<RoomDefinition[]>(() => {
-    const saved = localStorage.getItem('cad_rooms');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [assets, setAssets] = useState<PlacedAsset[]>(() => {
-    const saved = localStorage.getItem('cad_assets');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [rooms, setRooms] = useState<RoomDefinition[]>(DEFAULT_ROOMS);
+  const [assets, setAssets] = useState<PlacedAsset[]>(DEFAULT_ASSETS);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
 
   // Gemini BYOK (Bring Your Own Key) State
@@ -50,14 +44,6 @@ export default function App() {
   const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
   const [showShareModal, setShowShareModal] = useState<boolean>(false);
   const [pendingAiAction, setPendingAiAction] = useState<(() => void) | null>(null);
-
-  useEffect(() => {
-    localStorage.setItem('cad_rooms', JSON.stringify(rooms));
-  }, [rooms]);
-
-  useEffect(() => {
-    localStorage.setItem('cad_assets', JSON.stringify(assets));
-  }, [assets]);
 
   useEffect(() => {
     const stored = sessionStorage.getItem('gemini_api_key');
@@ -87,6 +73,16 @@ export default function App() {
 
   // Tab state synced with high-contrast vertical bento rail
   const [activeTab, setActiveTab] = useState<'library' | 'rooms' | 'reports'>('library');
+
+  // Track page views when user switches between important active tabs or view modes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).gtag) {
+      (window as any).gtag('config', 'G-BC1CJXVX12', {
+        page_title: `ArchViz Pro - ${activeTab.toUpperCase()} Section (${viewMode})`,
+        page_path: `/${activeTab}/${viewMode.toLowerCase()}`
+      });
+    }
+  }, [activeTab, viewMode]);
 
   // Asset counts generator for quick lookup
   const nextAssetIdNumberRef = React.useRef(99);
@@ -246,55 +242,15 @@ export default function App() {
 
   // Dragging event coordinate update
   const handleUpdateAssetPosition = (id: string, x: number, z: number) => {
-    let finalX = x;
-    let finalZ = z;
-    const SNAP_THRESHOLD = 0.4;
-    const GRID_SIZE = 0.5;
-
-    // Grid snapping
-    const gridX = Math.round(finalX / GRID_SIZE) * GRID_SIZE;
-    const gridZ = Math.round(finalZ / GRID_SIZE) * GRID_SIZE;
-    if (Math.abs(finalX - gridX) < 0.15) finalX = gridX;
-    if (Math.abs(finalZ - gridZ) < 0.15) finalZ = gridZ;
-
-    // Room wall snapping
-    rooms.forEach(room => {
-      const minX = room.x - room.width / 2;
-      const maxX = room.x + room.width / 2;
-      const minZ = room.z - room.depth / 2;
-      const maxZ = room.z + room.depth / 2;
-      
-      if (finalX >= minX - SNAP_THRESHOLD && finalX <= maxX + SNAP_THRESHOLD &&
-          finalZ >= minZ - SNAP_THRESHOLD && finalZ <= maxZ + SNAP_THRESHOLD) {
-          
-          if (Math.abs(finalX - minX) < SNAP_THRESHOLD) finalX = minX;
-          else if (Math.abs(finalX - maxX) < SNAP_THRESHOLD) finalX = maxX;
-
-          if (Math.abs(finalZ - minZ) < SNAP_THRESHOLD) finalZ = minZ;
-          else if (Math.abs(finalZ - maxZ) < SNAP_THRESHOLD) finalZ = maxZ;
-      }
-    });
-
-    // Other equipment snapping
-    assets.forEach(asset => {
-      if (asset.id === id) return;
-      if (Math.abs(finalX - asset.position.x) < SNAP_THRESHOLD && Math.abs(finalZ - asset.position.z) < SNAP_THRESHOLD * 2) {
-         if (Math.abs(finalX - asset.position.x) < 0.3) finalX = asset.position.x;
-      }
-      if (Math.abs(finalZ - asset.position.z) < SNAP_THRESHOLD && Math.abs(finalX - asset.position.x) < SNAP_THRESHOLD * 2) {
-         if (Math.abs(finalZ - asset.position.z) < 0.3) finalZ = asset.position.z;
-      }
-    });
-
     // Find if the coordinates fall within any room boundaries dynamically
     const containingRoom = rooms.find((room) => {
       const halfW = room.width / 2;
       const halfD = room.depth / 2;
       return (
-        finalX >= room.x - halfW &&
-        finalX <= room.x + halfW &&
-        finalZ >= room.z - halfD &&
-        finalZ <= room.z + halfD
+        x >= room.x - halfW &&
+        x <= room.x + halfW &&
+        z >= room.z - halfD &&
+        z <= room.z + halfD
       );
     });
 
@@ -303,7 +259,7 @@ export default function App() {
         a.id === id
           ? {
               ...a,
-              position: { ...a.position, x: finalX, z: finalZ },
+              position: { ...a.position, x, z },
               assignedRoomId: containingRoom ? containingRoom.id : undefined,
             }
           : a
@@ -339,9 +295,7 @@ export default function App() {
   };
 
   // Blueprint trace ground underlay states
-  const [blueprintImage, setBlueprintImage] = useState<string | null>(() => {
-    try { return localStorage.getItem('cad_blueprint'); } catch { return null; }
-  });
+  const [blueprintImage, setBlueprintImage] = useState<string | null>(null);
   const [blueprintAspect, setBlueprintAspect] = useState<number>(1.33); // standard widescreen
   const [blueprintOpacity, setBlueprintOpacity] = useState<number>(0.5);
   const [blueprintScale, setBlueprintScale] = useState<number>(40); // default meter workspace width
@@ -349,18 +303,6 @@ export default function App() {
   const [blueprintOffsetZ, setBlueprintOffsetZ] = useState<number>(0);
   const [blueprintVisible, setBlueprintVisible] = useState<boolean>(true);
   const [isDigitizing, setIsDigitizing] = useState<boolean>(false);
-
-  useEffect(() => {
-    try {
-      if (blueprintImage) {
-        localStorage.setItem('cad_blueprint', blueprintImage);
-      } else {
-        localStorage.removeItem('cad_blueprint');
-      }
-    } catch {
-      // Ignore if image exceeds quota
-    }
-  }, [blueprintImage]);
 
   const handleBlueprintLoaded = (image: string | null, aspect: number) => {
     setBlueprintImage(image);
@@ -872,22 +814,6 @@ export default function App() {
                   <span className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
                   <p><b>Share & Export integration:</b> Export your schematic to PDF/Image formats, save as local JSON, or copy the direct HTML embed snippets to plug into your own site securely.</p>
                 </div>
-              </div>
-
-              <div className="space-y-3 text-xs text-slate-600 leading-normal border-b border-slate-100 pb-4">
-                <h3 className="font-bold text-slate-800 text-sm mt-2">Why This Platform Is In A Class Of Its Own</h3>
-                <p>This application stands as the most advanced, real-time spatial visualization tool available for web browsers. Unlike legacy desktop CAD software which requires training and lacks dynamic intelligence, this tool leverages web-native 3D technology and Gemini AI to instantly translate simple blueprints into intelligent, fully-interactive digital twin simulations.</p>
-                
-                <h4 className="font-bold text-slate-700 mt-2">What It Can Do:</h4>
-                <ul className="list-disc pl-4 space-y-1">
-                  <li><b>AI-Powered Digitization:</b> Automatically build 3D walls and environments from a 2D floorplan image without manual drafting.</li>
-                  <li><b>Real-Time Visual Simulations:</b> Overlay live 3D heatmaps for WiFi signal propagation (RF spread) and precise CCTV Field of View (FoV) camera cones.</li>
-                  <li><b>Magnetic Smart Snapping:</b> Intelligent drag-and-drop mechanics automatically align your network assets to walls and grids.</li>
-                  <li><b>Cross-Platform Export:</b> Generate instant bills of materials, JSON blueprints, and embed code for web sharing.</li>
-                </ul>
-
-                <h4 className="font-bold text-slate-700 mt-2">Who It Benefits:</h4>
-                <p>Perfect for <b>System Integrators, IT Architects, Security Consultants, and Facilities Operators</b> who need to design, quote, and communicate complex hardware deployments in an intuitive, visually stunning format that clients can immediately understand without downloading specialized software.</p>
               </div>
 
               <div className="flex justify-between items-center pt-1">

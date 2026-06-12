@@ -9,8 +9,7 @@ import {
   Share2, 
   Plus, 
   Trash2, 
-  RotateCw,
-  RotateCcw,
+  RotateCw, 
   Search, 
   SlidersHorizontal,
   Info,
@@ -22,10 +21,9 @@ import {
   FileImage,
   Upload,
   Settings,
-  MessageSquare,
-  Save
+  MessageSquare
 } from 'lucide-react';
-import { PlacedAsset, RoomDefinition, ZohoCreatorConfig, getAssetHeightLayer } from '../types';
+import { PlacedAsset, RoomDefinition, getAssetHeightLayer } from '../types';
 
 function getAssetSize(asset: PlacedAsset): { width: number; depth: number } {
   const scaleX = asset.scale?.x || 1.0;
@@ -691,15 +689,7 @@ export default function CADSidebar({
                   <button onClick={onResetCanvas} className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-slate-200 hover:border-red-300 hover:bg-red-50 text-slate-600 hover:text-red-700 text-xs font-bold transition-all shadow-xs">
                     <Trash2 className="w-3.5 h-3.5"/> Blank Canvas
                   </button>
-                  <button 
-                    onClick={() => {
-                      alert('Canvas auto-saves, but a manual save to browser local storage is successful!');
-                    }} 
-                    className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 text-xs font-bold transition-all shadow-xs"
-                  >
-                    <Save className="w-3.5 h-3.5"/> Save to Browser
-                  </button>
-                  <label className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 text-xs font-bold transition-all shadow-xs cursor-pointer col-span-2">
+                  <label className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 text-xs font-bold transition-all shadow-xs cursor-pointer">
                     <Database className="w-3.5 h-3.5"/> Import JSON
                     <input type="file" accept=".json" onChange={async (e) => {
                       const file = e.target.files?.[0];
@@ -1313,22 +1303,11 @@ export default function CADSidebar({
                   <button
                     type="button"
                     onClick={() => {
-                      const snap = (selectedAsset.rotationY - Math.PI / 4 + Math.PI * 2) % (Math.PI * 2);
-                      onUpdateAssetSpecs(selectedAsset.id, selectedAsset.specs || {}, selectedAsset.name, snap, selectedAsset.assignedRoomId);
-                    }}
-                    className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-700 shadow-xs transition-all cursor-pointer"
-                    title="Rotate -45° snaps"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
                       const snap = (selectedAsset.rotationY + Math.PI / 4) % (Math.PI * 2);
                       onUpdateAssetSpecs(selectedAsset.id, selectedAsset.specs || {}, selectedAsset.name, snap, selectedAsset.assignedRoomId);
                     }}
                     className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-700 shadow-xs transition-all cursor-pointer"
-                    title="Rotate +45° snaps"
+                    title="Rotate 45° snaps"
                   >
                     <RotateCw className="w-3.5 h-3.5" />
                   </button>
