@@ -4,15 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Office 3D Floor Planner & Asset Manager</title>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-BC1CJXVX12"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'G-BC1CJXVX12');
-    </script>
+    <!-- Google Analytics is initialised at runtime from VITE_GA_MEASUREMENT_ID
+         (see src/App.tsx). It stays disabled when the env var is unset. -->
   </head>
   <body>
     <div id="root"></div>

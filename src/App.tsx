@@ -40,6 +40,10 @@ import {
 // Restore a previously autosaved design, falling back to the default layout.
 const persisted = typeof window !== 'undefined' ? loadDesign() : null;
 
+// Google Analytics measurement ID, configured via the VITE_GA_MEASUREMENT_ID
+// env var. When unset, analytics stays completely disabled.
+const GA_MEASUREMENT_ID = (import.meta as any).env?.VITE_GA_MEASUREMENT_ID as string | undefined;
+
 export default function App() {
   const [rooms, setRooms] = useState<RoomDefinition[]>(persisted?.rooms ?? DEFAULT_ROOMS);
   const [assets, setAssets] = useState<PlacedAsset[]>(persisted?.assets ?? DEFAULT_ASSETS);
@@ -57,6 +61,25 @@ export default function App() {
   useEffect(() => {
     const stored = sessionStorage.getItem('gemini_api_key');
     if (stored) setGeminiApiKey(stored);
+  }, []);
+
+  // Initialise Google Analytics once, only when a measurement ID is configured.
+  useEffect(() => {
+    if (!GA_MEASUREMENT_ID || typeof window === 'undefined') return;
+    const w = window as any;
+    if (w.gtag) return; // already initialised
+
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
+    document.head.appendChild(script);
+
+    w.dataLayer = w.dataLayer || [];
+    w.gtag = function gtag() {
+      w.dataLayer.push(arguments);
+    };
+    w.gtag('js', new Date());
+    w.gtag('config', GA_MEASUREMENT_ID);
   }, []);
 
   const saveApiKey = (key: string) => {
@@ -85,8 +108,8 @@ export default function App() {
 
   // Track page views when user switches between important active tabs or view modes
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).gtag) {
-      (window as any).gtag('config', 'G-BC1CJXVX12', {
+    if (GA_MEASUREMENT_ID && typeof window !== 'undefined' && (window as any).gtag) {
+      (window as any).gtag('config', GA_MEASUREMENT_ID, {
         page_title: `ArchViz Pro - ${activeTab.toUpperCase()} Section (${viewMode})`,
         page_path: `/${activeTab}/${viewMode.toLowerCase()}`
       });
@@ -1085,10 +1108,6 @@ export default function App() {
         <div className="flex items-center gap-4">
           <span>SCALE: 1:50</span>
           <span>GRID_SNAP: 25cm</span>
-          <span className="flex items-center gap-1 text-emerald-600 font-bold">
-            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span> 
-            SYNCED TO ZOHO REPORTING
-          </span>
         </div>
       </footer>
     </div>
