@@ -3,11 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ThreeCanvas from './components/ThreeCanvas';
 import CADSidebar from './components/CADSidebar';
 import { DEFAULT_ROOMS, DEFAULT_ASSETS } from './data/defaultFloorPlan';
 import { PlacedAsset, RoomDefinition } from './types';
+import { findContainingRoom, getDefaultHeight, isInfrastructureType, makeId } from './utils/geometry';
+import { mapApiLayout } from './utils/layout';
+import { saveDesign, loadDesign, clearDesign } from './utils/persistence';
 import { 
   Building2, 
   RefreshCw, 
@@ -34,10 +37,16 @@ import {
   Download
 } from 'lucide-react';
 
+// Restore a previously autosaved design, falling back to the default layout.
+const persisted = typeof window !== 'undefined' ? loadDesign() : null;
+
 export default function App() {
-  const [rooms, setRooms] = useState<RoomDefinition[]>(DEFAULT_ROOMS);
-  const [assets, setAssets] = useState<PlacedAsset[]>(DEFAULT_ASSETS);
+  const [rooms, setRooms] = useState<RoomDefinition[]>(persisted?.rooms ?? DEFAULT_ROOMS);
+  const [assets, setAssets] = useState<PlacedAsset[]>(persisted?.assets ?? DEFAULT_ASSETS);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+
+  // Snapshot function registered by ThreeCanvas for PNG exports.
+  const captureRef = useRef<(() => string | null) | null>(null);
 
   // Gemini BYOK (Bring Your Own Key) State
   const [geminiApiKey, setGeminiApiKey] = useState<string>('');
@@ -90,17 +99,14 @@ export default function App() {
   // Instantiate assets dynamically at standard focus points
   const handleAddAsset = (type: string) => {
     nextAssetIdNumberRef.current += 1;
-    const uid = `${type}_${Date.now().toString().slice(-4)}_${nextAssetIdNumberRef.current}`;
-    
-    let category: 'infrastructure' | 'furniture' = 'furniture';
-    let label = '';
-    let height = 0.4;
-    let defaultSpecs: Record<string, string> = {};
+    const uid = makeId(type);
 
-    if (['ap', 'dp', 'tp', 'cctv', 'door_access', 'intercom', 'power_outlet', 'hdmi_port', 'projector_port'].includes(type)) {
-      category = 'infrastructure';
-      height = type === 'ap' || type === 'cctv' ? 3.2 : 0.8; // height parameters
-    }
+    const category: 'infrastructure' | 'furniture' = isInfrastructureType(type)
+      ? 'infrastructure'
+      : 'furniture';
+    const height = getDefaultHeight(type);
+    let label = '';
+    let defaultSpecs: Record<string, string> = {};
 
     // Build smart specifications depending on types
     switch (type) {
@@ -243,16 +249,7 @@ export default function App() {
   // Dragging event coordinate update
   const handleUpdateAssetPosition = (id: string, x: number, z: number) => {
     // Find if the coordinates fall within any room boundaries dynamically
-    const containingRoom = rooms.find((room) => {
-      const halfW = room.width / 2;
-      const halfD = room.depth / 2;
-      return (
-        x >= room.x - halfW &&
-        x <= room.x + halfW &&
-        z >= room.z - halfD &&
-        z <= room.z + halfD
-      );
-    });
+    const containingRoom = findContainingRoom(x, z, rooms);
 
     setAssets((prev) =>
       prev.map((a) =>
@@ -295,7 +292,7 @@ export default function App() {
   };
 
   // Blueprint trace ground underlay states
-  const [blueprintImage, setBlueprintImage] = useState<string | null>(null);
+  const [blueprintImage, setBlueprintImage] = useState<string | null>(persisted?.blueprintImage ?? null);
   const [blueprintAspect, setBlueprintAspect] = useState<number>(1.33); // standard widescreen
   const [blueprintOpacity, setBlueprintOpacity] = useState<number>(0.5);
   const [blueprintScale, setBlueprintScale] = useState<number>(40); // default meter workspace width
@@ -303,6 +300,12 @@ export default function App() {
   const [blueprintOffsetZ, setBlueprintOffsetZ] = useState<number>(0);
   const [blueprintVisible, setBlueprintVisible] = useState<boolean>(true);
   const [isDigitizing, setIsDigitizing] = useState<boolean>(false);
+
+  // Autosave the working design (debounced) so a refresh no longer wipes it.
+  useEffect(() => {
+    const handle = setTimeout(() => saveDesign(rooms, assets, blueprintImage), 600);
+    return () => clearTimeout(handle);
+  }, [rooms, assets, blueprintImage]);
 
   const handleBlueprintLoaded = (image: string | null, aspect: number) => {
     setBlueprintImage(image);
@@ -335,54 +338,9 @@ export default function App() {
       }
 
       const data = await response.json();
-      
-      // Map returned rooms with dynamic IDs
-      const mappedRooms: RoomDefinition[] = (data.rooms || []).map((roomData: any, index: number) => ({
-        id: `room_${Date.now()}_${index}`,
-        name: roomData.name || `Room ${index + 1}`,
-        x: Number(roomData.x),
-        z: Number(roomData.z),
-        width: Number(roomData.width),
-        depth: Number(roomData.depth),
-        areaSqFt: roomData.areaSqFt || Math.round(Number(roomData.width) * Number(roomData.depth) * 10.76),
-        color: roomData.color || '#ecfdf5',
-        textColor: roomData.textColor || '#065f46',
-      }));
 
-      // Map returned assets with dynamic IDs
-      const mappedAssets: PlacedAsset[] = (data.assets || []).map((assetData: any, index: number) => {
-        const hType = assetData.type || 'ap';
-        const isCeiling = hType === 'ap' || hType === 'cctv';
-        const category = ['ap', 'dp', 'tp', 'cctv', 'door_access', 'intercom', 'power_outlet'].includes(hType)
-          ? 'infrastructure'
-          : 'furniture';
-
-        // Find intersecting room to auto-bind it
-        const assignedRoom = mappedRooms.find(r => {
-          const halfW = r.width / 2;
-          const halfD = r.depth / 2;
-          return assetData.x >= r.x - halfW &&
-                 assetData.x <= r.x + halfW &&
-                 assetData.z >= r.z - halfD &&
-                 assetData.z <= r.z + halfD;
-        });
-
-        return {
-          id: `asset_${Date.now()}_${index}`,
-          type: hType,
-          category,
-          name: assetData.name || `${hType.toUpperCase()} Node`,
-          position: {
-            x: Number(assetData.x),
-            y: isCeiling ? 3.2 : 0.8,
-            z: Number(assetData.z),
-          },
-          rotationY: 0,
-          scale: { x: 1, y: 1, z: 1 },
-          specs: assetData.specs || { Manufacturer: 'AI Recommended', Status: 'Provisioned' },
-          assignedRoomId: assignedRoom?.id,
-        };
-      });
+      // Normalise the loosely-typed AI payload into strongly-typed state.
+      const { rooms: mappedRooms, assets: mappedAssets } = mapApiLayout(data);
 
       // Update states
       setRooms(mappedRooms);
@@ -504,6 +462,7 @@ export default function App() {
       setAssets([]);
       setBlueprintImage(null);
       setSelectedAssetId(null);
+      clearDesign();
     }
   };
 
@@ -533,31 +492,23 @@ export default function App() {
         },
         body: JSON.stringify({ prompt }),
       });
-      if (!response.ok) throw new Error('Failed to rebuild from prompt.');
-      
-      const data = await response.json();
-      
-      // I can reuse the mapping logic from handleDigitizeBlueprint if needed,
-      // but let's assume the API returns fully mapped objects for simplicity here too.
-      // Re-use same mapping structure: 
-      const mappedRooms: RoomDefinition[] = (data.rooms || []).map((roomData: any, index: number) => ({
-        id: `room_${Date.now()}_${index}`,
-        name: roomData.name || `Room ${index + 1}`,
-        x: Number(roomData.x),
-        z: Number(roomData.z),
-        width: Number(roomData.width),
-        depth: Number(roomData.depth),
-        areaSqFt: roomData.areaSqFt || Math.round(Number(roomData.width) * Number(roomData.depth) * 10.76),
-        color: roomData.color || '#ecfdf5',
-        textColor: roomData.textColor || '#065f46',
-      }));
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to rebuild from prompt.');
+      }
 
-      // Map assets...
-      // I'll just skip detailed mapping and assume the API returns objects matching the Type.
-      
+      const data = await response.json();
+
+      // Use the same normalisation pipeline as the digitizer so assets are
+      // correctly typed, positioned and auto-bound to their rooms.
+      const { rooms: mappedRooms, assets: mappedAssets } = mapApiLayout(data);
+
+      if (mappedRooms.length === 0 && mappedAssets.length === 0) {
+        throw new Error('The AI returned an empty layout. Try a more descriptive prompt.');
+      }
+
       setRooms(mappedRooms);
-      setAssets(data.assets || []);
-      
+      setAssets(mappedAssets);
     } catch (err: any) {
       alert(err.message || 'Error processing prompt.');
     } finally {
@@ -567,6 +518,111 @@ export default function App() {
 
   // Active highlighted item lookup for sidebar coordination
   const selectedAsset = assets.find((a) => a.id === selectedAssetId) || null;
+
+  // ---- Lightweight toast helper (replaces repeated inline DOM building) ----
+  const showToast = (message: string, tone: 'success' | 'error' = 'success') => {
+    const toast = document.createElement('div');
+    const palette =
+      tone === 'error'
+        ? 'from-rose-600 to-red-600 border-red-400'
+        : 'from-emerald-600 to-teal-600 border-emerald-400';
+    toast.className = `fixed bottom-14 right-5 bg-gradient-to-r ${palette} text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border z-[120] flex items-center gap-1.5 animate-in slide-in-from-bottom-4 duration-300 max-w-sm`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4500);
+  };
+
+  // ---- Real export actions used by the Share & Export modal ----
+
+  // PNG snapshot of the live 3D canvas.
+  const handleExportImage = () => {
+    const dataUrl = captureRef.current?.();
+    if (!dataUrl) {
+      showToast('Canvas is not ready for capture yet. Try again in a moment.', 'error');
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = `archviz_snapshot_${new Date().toISOString().split('T')[0]}.png`;
+    link.click();
+    showToast('Snapshot PNG downloaded.');
+  };
+
+  // Full JSON schematic backup.
+  const handleExportJSON = () => {
+    const payload = { exportedAt: new Date().toISOString(), rooms, assets, blueprintImage };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'office_digital_twin.json';
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast('Design JSON exported.');
+  };
+
+  // Copy the design payload to the clipboard for pasting into other tools.
+  const handleCopyJSON = async () => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify({ rooms, assets }, null, 2));
+      showToast('Design JSON copied to clipboard.');
+    } catch {
+      showToast('Clipboard access was blocked by the browser.', 'error');
+    }
+  };
+
+  // Printable PDF report (via the browser print dialog) including a snapshot,
+  // room summary and full asset inventory.
+  const handleExportPDF = () => {
+    const snapshot = captureRef.current?.();
+    const totalArea = rooms.reduce((sum, r) => sum + r.width * r.depth * 10.7639, 0);
+    const roomRows = rooms
+      .map((r) => {
+        const count = assets.filter((a) => a.assignedRoomId === r.id).length;
+        return `<tr><td>${r.name}</td><td>${Math.round(r.width * r.depth * 10.7639)} sqft</td><td>${count}</td></tr>`;
+      })
+      .join('');
+    const assetRows = assets
+      .map((a) => {
+        const room = rooms.find((r) => r.id === a.assignedRoomId)?.name || 'Unassigned';
+        return `<tr><td>${a.name}</td><td>${a.type}</td><td>${a.category}</td><td>${room}</td><td>${a.position.x.toFixed(1)}, ${a.position.z.toFixed(1)}</td></tr>`;
+      })
+      .join('');
+
+    const win = window.open('', '_blank');
+    if (!win) {
+      showToast('Pop-up blocked. Allow pop-ups to export the PDF report.', 'error');
+      return;
+    }
+    win.document.write(`<!doctype html><html><head><title>ArchViz Pro Report</title>
+      <style>
+        body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#0f172a;margin:32px;}
+        h1{font-size:20px;margin:0 0 4px;} .sub{color:#64748b;font-size:12px;margin-bottom:20px;}
+        img{max-width:100%;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:20px;}
+        table{width:100%;border-collapse:collapse;margin-bottom:24px;font-size:12px;}
+        th,td{border:1px solid #e2e8f0;padding:6px 8px;text-align:left;}
+        th{background:#f8fafc;} h2{font-size:14px;margin:16px 0 8px;}
+        .stats{display:flex;gap:24px;margin-bottom:20px;font-size:13px;}
+        .stats b{display:block;font-size:20px;}
+      </style></head><body>
+      <h1>Office Digital Twin — Audit Report</h1>
+      <div class="sub">Generated ${new Date().toLocaleString()}</div>
+      <div class="stats">
+        <div><b>${rooms.length}</b>Rooms</div>
+        <div><b>${assets.length}</b>Assets</div>
+        <div><b>${Math.round(totalArea)}</b>Total sqft</div>
+      </div>
+      ${snapshot ? `<img src="${snapshot}" alt="Floor plan snapshot" />` : ''}
+      <h2>Room Summary</h2>
+      <table><thead><tr><th>Room</th><th>Area</th><th>Assets</th></tr></thead><tbody>${roomRows}</tbody></table>
+      <h2>Asset Inventory</h2>
+      <table><thead><tr><th>Name</th><th>Type</th><th>Category</th><th>Room</th><th>X, Z (m)</th></tr></thead><tbody>${assetRows}</tbody></table>
+      </body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 400);
+    showToast('Opening printable report…');
+  };
 
   return (
     <div className="flex flex-col h-screen w-screen bg-slate-50 text-slate-800 font-sans overflow-hidden" id="main-applet-root">
@@ -740,6 +796,7 @@ export default function App() {
             blueprintOffsetX={blueprintOffsetX}
             blueprintOffsetZ={blueprintOffsetZ}
             blueprintVisible={blueprintVisible}
+            captureRef={captureRef}
           />
         </div>
 
@@ -931,15 +988,12 @@ export default function App() {
             </div>
 
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 bg-white">
-              {/* HTML / EMBED / IFRAME Options */}
+              {/* SHARE / DATA Options */}
               <div className="space-y-4">
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Integration Code</h3>
-                
-                <button 
-                  onClick={() => {
-                     navigator.clipboard.writeText('<div>Office 3D Digital Twin Planner</div>');
-                     alert('HTML Snippet copied to clipboard!');
-                  }}
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Share Data</h3>
+
+                <button
+                  onClick={handleCopyJSON}
                   className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all group"
                 >
                   <div className="flex items-center gap-3">
@@ -947,60 +1001,40 @@ export default function App() {
                       <Code2 className="w-4 h-4" />
                     </div>
                     <div className="text-left">
-                      <div className="text-sm font-semibold text-slate-700 group-hover:text-blue-700">HTML Snippet</div>
-                      <div className="text-[10px] text-slate-500">Copy raw HTML structure</div>
+                      <div className="text-sm font-semibold text-slate-700 group-hover:text-blue-700">Copy Design JSON</div>
+                      <div className="text-[10px] text-slate-500">Copy full layout to clipboard</div>
                     </div>
                   </div>
                   <Copy className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
                 </button>
 
-                <button 
-                  onClick={() => {
-                     navigator.clipboard.writeText('<script src="https://example.com/embed.js"></script>');
-                     alert('Embed Script copied to clipboard!');
-                  }}
+                <button
+                  onClick={handleExportJSON}
                   className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all group"
                 >
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-slate-100 text-slate-600 rounded-lg group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
-                      <Layout className="w-4 h-4" />
+                      <Download className="w-4 h-4" />
                     </div>
                     <div className="text-left">
-                      <div className="text-sm font-semibold text-slate-700 group-hover:text-blue-700">Embed Script</div>
-                      <div className="text-[10px] text-slate-500">Copy JS embed snippet</div>
+                      <div className="text-sm font-semibold text-slate-700 group-hover:text-blue-700">Download JSON</div>
+                      <div className="text-[10px] text-slate-500">Reimportable schematic backup</div>
                     </div>
                   </div>
-                  <Copy className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
+                  <Download className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
                 </button>
 
-                <button 
-                  onClick={() => {
-                     navigator.clipboard.writeText('<iframe src="https://example.com"></iframe>');
-                     alert('IFrame tag copied to clipboard!');
-                  }}
-                  className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-slate-100 text-slate-600 rounded-lg group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
-                      <Layers className="w-4 h-4" />
-                    </div>
-                    <div className="text-left">
-                      <div className="text-sm font-semibold text-slate-700 group-hover:text-blue-700">IFrame</div>
-                      <div className="text-[10px] text-slate-500">Copy standard IFrame tag</div>
-                    </div>
-                  </div>
-                  <Copy className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
-                </button>
+                <div className="text-[10px] text-slate-400 leading-relaxed p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  Your design is autosaved to this browser. Export JSON to move it between devices, or re-import it from the Inventory tab.
+                </div>
               </div>
 
               {/* MEDIA Export Options */}
               <div className="space-y-4">
                 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Export Media</h3>
-                
-                <button 
-                  onClick={() => {
-                    alert('Generating PDF report. Please check your downloads.');
-                  }}
+
+                <button
+                  onClick={handleExportPDF}
                   className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-green-400 hover:bg-green-50 transition-all group"
                 >
                   <div className="flex items-center gap-3">
@@ -1009,16 +1043,14 @@ export default function App() {
                     </div>
                     <div className="text-left">
                       <div className="text-sm font-semibold text-slate-700 group-hover:text-green-700">Export as PDF</div>
-                      <div className="text-[10px] text-slate-500">Includes summary and items list</div>
+                      <div className="text-[10px] text-slate-500">Snapshot + room & asset report</div>
                     </div>
                   </div>
                   <Download className="w-4 h-4 text-slate-400 group-hover:text-green-500" />
                 </button>
 
-                <button 
-                  onClick={() => {
-                    alert('Downloading Snapshot image of the canvas.');
-                  }}
+                <button
+                  onClick={handleExportImage}
                   className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-green-400 hover:bg-green-50 transition-all group"
                 >
                   <div className="flex items-center gap-3">
@@ -1028,30 +1060,6 @@ export default function App() {
                     <div className="text-left">
                       <div className="text-sm font-semibold text-slate-700 group-hover:text-green-700">Export as Image</div>
                       <div className="text-[10px] text-slate-500">PNG snapshot of the 3D grid</div>
-                    </div>
-                  </div>
-                  <Download className="w-4 h-4 text-slate-400 group-hover:text-green-500" />
-                </button>
-
-                <button 
-                  onClick={() => {
-                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ rooms, assets }));
-                    const downloadAnchorNode = document.createElement('a');
-                    downloadAnchorNode.setAttribute("href", dataStr);
-                    downloadAnchorNode.setAttribute("download", "office_digital_twin.json");
-                    document.body.appendChild(downloadAnchorNode);
-                    downloadAnchorNode.click();
-                    downloadAnchorNode.remove();
-                  }}
-                  className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-green-400 hover:bg-green-50 transition-all group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-slate-100 text-slate-600 rounded-lg group-hover:bg-green-100 group-hover:text-green-600 transition-colors">
-                      <Code2 className="w-4 h-4" />
-                    </div>
-                    <div className="text-left">
-                      <div className="text-sm font-semibold text-slate-700 group-hover:text-green-700">Export as JSON</div>
-                      <div className="text-[10px] text-slate-500">Raw schematic data backup</div>
                     </div>
                   </div>
                   <Download className="w-4 h-4 text-slate-400 group-hover:text-green-500" />

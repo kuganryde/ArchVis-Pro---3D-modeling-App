@@ -62,6 +62,9 @@ export interface RoomDefinition {
   width: number;
   depth: number;
   textColor?: string;
+  // Optional explicit wall finish. When omitted it is derived from the room
+  // name (see getRoomWallStyle) so imported / AI layouts still render sensibly.
+  wallStyle?: 'glass' | 'concrete';
 }
 
 export interface PlacedAsset {

@@ -33,68 +33,74 @@ const getGeminiClient = (clientKey?: string) => {
 // Helper delay function for exponential backoff retries
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Robust function with attempt retries and model fallback
-const queryGeminiWithRetry = async (ai: any, imagePart: any, prompt: string) => {
-  // We prioritize gemini-3.5-flash, and fall back to gemini-3.1-flash-lite if the first model is unavailable.
-  const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite"];
+// Candidate models in priority order. gemini-2.5-flash is the primary vision
+// model; gemini-2.5-flash-lite is the lighter/cheaper fallback.
+const MODELS_TO_TRY = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
+
+// Shared response schema so the digitizer and the prompt rebuilder return the
+// exact same well-formed shape the client mapper expects.
+const LAYOUT_RESPONSE_SCHEMA = {
+  type: Type.OBJECT,
+  required: ["rooms", "assets"],
+  properties: {
+    rooms: {
+      type: Type.ARRAY,
+      description: "Extracted architectural rooms fitting the CAD blueprint",
+      items: {
+        type: Type.OBJECT,
+        required: ["name", "x", "z", "width", "depth", "areaSqFt", "color", "textColor"],
+        properties: {
+          name: { type: Type.STRING },
+          x: { type: Type.NUMBER },
+          z: { type: Type.NUMBER },
+          width: { type: Type.NUMBER },
+          depth: { type: Type.NUMBER },
+          areaSqFt: { type: Type.NUMBER },
+          color: { type: Type.STRING },
+          textColor: { type: Type.STRING },
+        },
+      },
+    },
+    assets: {
+      type: Type.ARRAY,
+      description: "Suggested initial networking and furniture asset nodes matching scanned spaces",
+      items: {
+        type: Type.OBJECT,
+        required: ["type", "name", "x", "z"],
+        properties: {
+          type: { type: Type.STRING, description: "e.g. 'ap', 'dp', 'cctv', 'desk_single', 'conference_table', 'chair_office'" },
+          name: { type: Type.STRING },
+          x: { type: Type.NUMBER },
+          z: { type: Type.NUMBER },
+          specs: {
+            type: Type.OBJECT,
+            description: "Key-value pair specs e.g. Manufacturer, Model, Status",
+          },
+        },
+      },
+    },
+  },
+};
+
+// Robust generation helper with per-model attempt retries and model fallback.
+const generateLayoutWithRetry = async (ai: any, contents: any) => {
   let lastError: any = null;
 
-  for (const model of modelsToTry) {
+  for (const model of MODELS_TO_TRY) {
     let attempts = 0;
     while (attempts < 3) {
       try {
-        console.log(`AI Digitizer: Querying model ${model} (attempt ${attempts + 1}/3)...`);
+        console.log(`AI Layout: Querying model ${model} (attempt ${attempts + 1}/3)...`);
         const response = await ai.models.generateContent({
           model,
-          contents: [imagePart, { text: prompt }],
+          contents,
           config: {
             responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              required: ["rooms", "assets"],
-              properties: {
-                rooms: {
-                  type: Type.ARRAY,
-                  description: "Extracted architectural rooms fitting the CAD blueprint",
-                  items: {
-                    type: Type.OBJECT,
-                    required: ["name", "x", "z", "width", "depth", "areaSqFt", "color", "textColor"],
-                    properties: {
-                      name: { type: Type.STRING },
-                      x: { type: Type.NUMBER },
-                      z: { type: Type.NUMBER },
-                      width: { type: Type.NUMBER },
-                      depth: { type: Type.NUMBER },
-                      areaSqFt: { type: Type.NUMBER },
-                      color: { type: Type.STRING },
-                      textColor: { type: Type.STRING },
-                    },
-                  },
-                },
-                assets: {
-                  type: Type.ARRAY,
-                  description: "Suggested initial networking and furniture asset nodes matching scanned spaces",
-                  items: {
-                    type: Type.OBJECT,
-                    required: ["type", "name", "x", "z"],
-                    properties: {
-                      type: { type: Type.STRING, description: "Must be 'ap', 'dp', 'cctv', 'desk_single', 'conference_table', or 'chair_office'" },
-                      name: { type: Type.STRING },
-                      x: { type: Type.NUMBER },
-                      z: { type: Type.NUMBER },
-                      specs: {
-                        type: Type.OBJECT,
-                        description: "Key-value pair specs e.g. Manufacturer, Model, Status",
-                      }
-                    },
-                  },
-                }
-              }
-            }
-          }
+            responseSchema: LAYOUT_RESPONSE_SCHEMA,
+          },
         });
-        
-        console.log(`AI Digitizer successfully parsed layout with model ${model}!`);
+
+        console.log(`AI Layout successfully parsed with model ${model}!`);
         return response;
       } catch (error: any) {
         lastError = error;
@@ -190,7 +196,7 @@ app.post("/api/digitize-blueprint", async (req, res) => {
     };
 
     // Query Gemini using our robust multi-attempt retry query wrapper
-    const response = await queryGeminiWithRetry(ai, imagePart, prompt);
+    const response = await generateLayoutWithRetry(ai, [imagePart, { text: prompt }]);
 
     const parsedData = JSON.parse(response.text || "{}");
     return res.json(parsedData);
@@ -211,18 +217,24 @@ app.post("/api/rebuild-from-prompt", async (req, res) => {
     if (!ai) return res.status(503).json({ error: "Gemini API Key is required. Please provide it in the UI." });
 
     const instructions = `
-      You are an expert AI Architect. Create a building layout from this prompt: "${prompt}".
-      Follow the exact schema as the digitization tool: return a JSON object with 'rooms' and 'assets' arrays.
+      You are Architect-7, an expert AI CAD systems engineer. Create an office
+      building layout from this prompt: "${prompt}".
+
+      Grid constraints:
+      - The digital twin workspace spans X: -18 to +18 and Z: -18 to +18 (metres),
+        with (0, 0) at the centre. Fit rooms side-by-side without overlapping.
+      - For each room supply center (x, z), dimensions (width, depth) in metres,
+        areaSqFt, a soft light background hex 'color' and a high-contrast 'textColor'.
+      - Populate 'assets' with a sensible mix of low-current infrastructure
+        (types 'ap', 'dp', 'tp', 'cctv') and furniture (types 'desk_single',
+        'conference_table', 'chair_office') positioned inside the rooms.
+
+      Return a JSON object with 'rooms' and 'assets' arrays matching the schema.
     `;
-    
-    // Using a direct call for text as it's less prone to high demand
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: [{ text: instructions }],
-      config: {
-        responseMimeType: "application/json",
-      }
-    });
+
+    // Reuse the same retry + schema pipeline as the digitizer so the response is
+    // guaranteed to be well-formed for the client mapper.
+    const response = await generateLayoutWithRetry(ai, [{ text: instructions }]);
 
     return res.json(JSON.parse(response.text || "{}"));
   } catch (error: any) {

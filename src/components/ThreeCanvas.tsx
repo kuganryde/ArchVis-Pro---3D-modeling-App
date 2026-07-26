@@ -1,121 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { PlacedAsset, RoomDefinition, getAssetHeightLayer } from '../types';
-
-function getOccupancyColor(assetCount: number, width: number, depth: number): string {
-  const areaSqFt = width * depth * 10.7639;
-  const capacity = Math.max(1, Math.floor(areaSqFt / 80));
-  const ratio = Math.min(1.5, assetCount / capacity);
-  
-  if (assetCount === 0) {
-    return '#10b981'; // Cozy emerald green for empty/light space
-  }
-  
-  // Interpolate between Emerald Green (16, 185, 129) -> Amber (245, 158, 11) -> Warning Red (239, 68, 68)
-  if (ratio <= 0.6) {
-    const t = ratio / 0.6;
-    const r = Math.round(16 + (245 - 16) * t);
-    const g = Math.round(185 + (158 - 185) * t);
-    const b = Math.round(129 + (11 - 129) * t);
-    return `rgb(${r}, ${g}, ${b})`;
-  } else {
-    const t = Math.min(1.0, (ratio - 0.6) / 0.9);
-    const r = Math.round(245 + (239 - 245) * t);
-    const g = Math.round(158 + (68 - 158) * t);
-    const b = Math.round(11 + (68 - 11) * t);
-    return `rgb(${r}, ${g}, ${b})`;
-  }
-}
-
-function getAssetSize(asset: PlacedAsset): { width: number; depth: number } {
-  const scaleX = asset.scale?.x || 1.0;
-  const scaleZ = asset.scale?.z || 1.0;
-
-  switch (asset.type) {
-    case 'ap':
-      return { width: 0.8, depth: 0.8 };
-    case 'dp':
-    case 'tp':
-    case 'hdmi_port':
-    case 'projector_port':
-    case 'door_access':
-    case 'intercom':
-      return { width: 0.4, depth: 0.4 };
-    case 'power_outlet':
-      return { width: 0.6, depth: 0.6 };
-    case 'cctv':
-      return { width: 0.5, depth: 0.5 };
-    case 'desk_single':
-      return { width: 1.2, depth: 0.7 };
-    case 'desk_cluster_4':
-    case 'desk_cluster_6':
-      return { width: scaleX, depth: scaleZ };
-    case 'conference_table':
-      return { width: scaleX, depth: scaleZ };
-    case 'chair_office':
-    case 'chair_lounge':
-      return { width: 0.6, depth: 0.6 };
-    case 'reception_desk':
-      return { width: 2.4, depth: 1.2 };
-    case 'whiteboard':
-      return { width: 0.2, depth: 1.2 };
-    case 'cabinet':
-      return { width: 1.0, depth: 0.5 };
-    case 'plant_pot':
-      return { width: 0.6, depth: 0.6 };
-    default:
-      return { width: 0.8, depth: 0.8 };
-  }
-}
-
-function isOverlapping(assetA: PlacedAsset, assetB: PlacedAsset): boolean {
-  // Only check collision if they are on the same height layer!
-  if (getAssetHeightLayer(assetA.type) !== getAssetHeightLayer(assetB.type)) {
-    return false;
-  }
-
-  const sizeA = getAssetSize(assetA);
-  const sizeB = getAssetSize(assetB);
-  
-  // Use circle collision approximation for natural layout spacing tolerance
-  const rA = Math.max(sizeA.width, sizeA.depth) * 0.42;
-  const rB = Math.max(sizeB.width, sizeB.depth) * 0.42;
-  
-  const dx = assetA.position.x - assetB.position.x;
-  const dz = assetA.position.z - assetB.position.z;
-  const dist = Math.sqrt(dx * dx + dz * dz);
-  
-  return dist < (rA + rB);
-}
-
-function isAssetOutsideRooms(asset: PlacedAsset, rooms: RoomDefinition[]): boolean {
-  if (rooms.length === 0) return false;
-  
-  const size = getAssetSize(asset);
-  const halfW = size.width / 2;
-  const halfD = size.depth / 2;
-  
-  return !rooms.some((room) => {
-    const roomMinX = room.x - room.width / 2;
-    const roomMaxX = room.x + room.width / 2;
-    const roomMinZ = room.z - room.depth / 2;
-    const roomMaxZ = room.z + room.depth / 2;
-    
-    const assetMinX = asset.position.x - halfW;
-    const assetMaxX = asset.position.x + halfW;
-    const assetMinZ = asset.position.z - halfD;
-    const assetMaxZ = asset.position.z + halfD;
-    
-    // Allow a small nesting tolerance
-    return (
-      assetMinX >= roomMinX - 0.08 &&
-      assetMaxX <= roomMaxX + 0.08 &&
-      assetMinZ >= roomMinZ - 0.08 &&
-      assetMaxZ <= roomMaxZ + 0.08
-    );
-  });
-}
+import { PlacedAsset, RoomDefinition } from '../types';
+import {
+  getAssetSize,
+  isOverlapping,
+  isAssetOutsideRooms,
+  getOccupancyColor,
+  getRoomWallStyle,
+} from '../utils/geometry';
 
 function applyConflictMaterials(group: THREE.Group) {
   group.traverse((child) => {
@@ -166,6 +59,9 @@ interface ThreeCanvasProps {
   blueprintOffsetX?: number;
   blueprintOffsetZ?: number;
   blueprintVisible?: boolean;
+  // When provided, the canvas registers a snapshot function here so the parent
+  // can capture a PNG of the current 3D view for exports.
+  captureRef?: React.MutableRefObject<(() => string | null) | null>;
 }
 
 export default function ThreeCanvas({
@@ -187,6 +83,7 @@ export default function ThreeCanvas({
   blueprintOffsetX = 0,
   blueprintOffsetZ = 0,
   blueprintVisible = true,
+  captureRef,
 }: ThreeCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -252,6 +149,7 @@ export default function ThreeCanvas({
       canvas: canvasRef.current,
       antialias: true,
       alpha: true,
+      preserveDrawingBuffer: true, // required so the canvas can be captured to PNG
     });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
@@ -351,11 +249,25 @@ export default function ThreeCanvas({
 
     renderLoop();
 
+    // Expose a snapshot function so the parent can export a PNG of the view.
+    if (captureRef) {
+      captureRef.current = () => {
+        try {
+          renderer.render(scene, camera);
+          return renderer.domElement.toDataURL('image/png');
+        } catch (err) {
+          console.error('Snapshot capture failed:', err);
+          return null;
+        }
+      };
+    }
+
     return () => {
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
       resizeObserver.disconnect();
       controls.dispose();
       renderer.dispose();
+      if (captureRef) captureRef.current = null;
     };
   }, [rooms]);
 
@@ -508,15 +420,15 @@ export default function ThreeCanvas({
         const wallHeight = 2.4;
         const wallThickness = 0.12;
 
+        // Derive the wall finish from the room (explicit wallStyle or name-based
+        // heuristic) so imported / AI-generated rooms render sensibly too.
+        const wallStyle = getRoomWallStyle(room);
+
         // Draw outer room partitions
-        // 1. Top wall
-        createWallMesh(room.width, wallHeight, wallThickness, room.x, wallHeight / 2, room.z - room.depth / 2, 0, group, room.id === 'long_meeting' ? 'concrete' : 'glass');
-        // 2. Bottom wall
-        createWallMesh(room.width, wallHeight, wallThickness, room.x, wallHeight / 2, room.z + room.depth / 2, 0, group, room.id === 'long_meeting' ? 'concrete' : 'glass');
-        // 3. Left wall
-        createWallMesh(room.depth, wallHeight, wallThickness, room.x - room.width / 2, wallHeight / 2, room.z, Math.PI / 2, group, 'concrete');
-        // 4. Right wall
-        createWallMesh(room.depth, wallHeight, wallThickness, room.x + room.width / 2, wallHeight / 2, room.z, Math.PI / 2, group, room.id === 'server_room' ? 'concrete' : 'glass');
+        createWallMesh(room.width, wallHeight, wallThickness, room.x, wallHeight / 2, room.z - room.depth / 2, 0, group, wallStyle);
+        createWallMesh(room.width, wallHeight, wallThickness, room.x, wallHeight / 2, room.z + room.depth / 2, 0, group, wallStyle);
+        createWallMesh(room.depth, wallHeight, wallThickness, room.x - room.width / 2, wallHeight / 2, room.z, Math.PI / 2, group, wallStyle);
+        createWallMesh(room.depth, wallHeight, wallThickness, room.x + room.width / 2, wallHeight / 2, room.z, Math.PI / 2, group, wallStyle);
       }
 
       roomPlanGroup.add(group);
@@ -721,6 +633,15 @@ export default function ThreeCanvas({
       const cablingGroup = new THREE.Group();
       cablingGroup.name = 'CABLING_PATHS_GROUP';
 
+      // Locate the network rack (MDF/IDF). Prefer a room that looks like a
+      // server/comms room; otherwise fall back to the grid origin so cabling
+      // still renders for imported / AI layouts that have no server room.
+      const serverRoom = rooms.find((r) =>
+        /(server|comms|mdf|idf|network|rack)/i.test(`${r.id} ${r.name}`)
+      );
+      const rackX = serverRoom ? serverRoom.x : 0;
+      const rackZ = serverRoom ? serverRoom.z : 0;
+
       assets.forEach((asset) => {
         if (asset.category !== 'infrastructure') return;
 
@@ -734,10 +655,6 @@ export default function ThreeCanvas({
 
         const ceilingY = (viewMode === '3D') ? 3.2 : 0.1;
         const rackY = (viewMode === '3D') ? 1.2 : 0.1;
-
-        // MDF/IDF Network Rack Center in Server Room
-        const rackX = 6.0;
-        const rackZ = 6.8;
 
         const points = [
           new THREE.Vector3(xA, yA, zA),
