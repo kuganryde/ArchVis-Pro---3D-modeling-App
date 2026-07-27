@@ -170,9 +170,41 @@ use; the AI features require a Gemini key (server-side or in-app).
 | `GEMINI_API_KEY`          | For AI   | Server-side Google Gemini key. Falls back to the in-app key if unset.       |
 | `APP_URL`                 | No       | Public URL where the app is hosted (self-referential links).                |
 | `VITE_GA_MEASUREMENT_ID`  | No       | Google Analytics 4 ID (e.g. `G-XXXXXXXXXX`). Analytics is disabled if unset. |
+| `VITE_SUPABASE_URL`       | For SaaS | Supabase project URL. Enables accounts + cloud projects when set (with the key below). |
+| `VITE_SUPABASE_ANON_KEY`  | For SaaS | Supabase anon/publishable key. Required alongside the URL to enable SaaS mode. |
 
 > `VITE_`-prefixed variables are exposed to the browser at build time; everything
 > else stays server-side only.
+
+---
+
+## ☁️ SaaS Mode (multi-tenant, cloud projects)
+
+ArchViz Pro runs in two modes, decided automatically by whether Supabase is
+configured:
+
+- **Local mode** (default, no Supabase env vars) — single user, no login;
+  designs autosave to the browser's `localStorage`, exactly as before.
+- **SaaS mode** (both `VITE_SUPABASE_*` set) — email/password **accounts**,
+  per-user **workspaces**, and **cloud-saved projects** with a project switcher
+  in the header. Tenant isolation is enforced by Postgres Row-Level Security.
+
+### Enable SaaS mode
+
+1. Create a project at [supabase.com](https://supabase.com).
+2. Apply the schema: open the SQL editor and run
+   [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql)
+   (or `supabase db push` with the CLI). This creates `profiles`, `workspaces`,
+   `workspace_members` and `projects`, the RLS policies, and a signup trigger
+   that gives each new user a personal workspace.
+3. Copy the **Project URL** and **anon key** into `VITE_SUPABASE_URL` and
+   `VITE_SUPABASE_ANON_KEY`.
+4. Restart the dev server / rebuild. Users now sign up, and each design is saved
+   to their workspace in the cloud.
+
+> The AI features remain BYOK in this slice (users supply their own Gemini key).
+> Hosted, metered, plan-gated AI + Stripe billing are the next milestone — see
+> [`docs/SAAS.md`](docs/SAAS.md).
 
 ---
 

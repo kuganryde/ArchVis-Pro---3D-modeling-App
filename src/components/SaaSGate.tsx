@@ -1,0 +1,214 @@
+/**
+ * Top-level gate that turns ArchViz Pro into a multi-tenant SaaS when Supabase
+ * is configured:
+ *   - not configured  -> render <App /> in local (localStorage) mode.
+ *   - configured + no session -> <AuthScreen />.
+ *   - configured + session -> load the user's workspace + a project, then render
+ *     <App /> wired to cloud persistence with a project switcher / user menu.
+ */
+import React, { useCallback, useEffect, useState } from 'react';
+import { Loader2, Plus, LogOut, ChevronDown } from 'lucide-react';
+import App, { AppDesign } from '../App';
+import AuthScreen from './AuthScreen';
+import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabase';
+import { DEFAULT_ROOMS, DEFAULT_ASSETS } from '../data/defaultFloorPlan';
+import { showToast } from '../utils/toast';
+import {
+  Workspace,
+  ProjectSummary,
+  ensureWorkspace,
+  listProjects,
+  getProject,
+  createProject,
+  saveProjectDesign,
+} from '../lib/projects';
+
+const EMPTY_DESIGN: AppDesign = { rooms: [], assets: [], blueprintImage: null };
+const SEED_DESIGN: AppDesign = { rooms: DEFAULT_ROOMS, assets: DEFAULT_ASSETS, blueprintImage: null };
+
+function FullScreenMessage({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen w-screen bg-slate-50 flex items-center justify-center text-slate-500 text-sm gap-2">
+      {children}
+    </div>
+  );
+}
+
+export default function SaaSGate() {
+  const { session, loading, configured } = useAuth();
+
+  // Local mode — behave exactly like the original single-user app.
+  if (!configured) return <App />;
+  if (loading) {
+    return (
+      <FullScreenMessage>
+        <Loader2 className="w-4 h-4 animate-spin" /> Loading…
+      </FullScreenMessage>
+    );
+  }
+  if (!session) return <AuthScreen />;
+
+  // WorkspaceView remounts naturally on sign-out/in (this branch unmounts when
+  // the session clears), so it needs no explicit key.
+  return <WorkspaceView email={session.user.email || 'Account'} />;
+}
+
+function WorkspaceView({ email }: { email: string }) {
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [currentId, setCurrentId] = useState<string | null>(null);
+  const [design, setDesign] = useState<AppDesign | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Bootstrap: workspace -> projects -> load (or seed) the first project.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const ws = await ensureWorkspace();
+        if (!active) return;
+        setWorkspace(ws);
+
+        let list = await listProjects(ws.id);
+        if (list.length === 0) {
+          const created = await createProject(ws.id, 'My First Project', SEED_DESIGN);
+          list = [{ id: created.id, name: created.name, updated_at: created.updated_at }];
+        }
+        if (!active) return;
+        setProjects(list);
+
+        const full = await getProject(list[0].id);
+        if (!active) return;
+        setCurrentId(full.id);
+        setDesign({
+          rooms: full.data?.rooms ?? [],
+          assets: full.data?.assets ?? [],
+          blueprintImage: full.data?.blueprintImage ?? null,
+        });
+      } catch (err: any) {
+        if (active) setError(err?.message || 'Failed to load your workspace.');
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const persist = useCallback(
+    (d: AppDesign) => {
+      if (!currentId) return;
+      saveProjectDesign(currentId, d).catch((e) =>
+        showToast(e?.message || 'Cloud save failed.', 'error')
+      );
+    },
+    [currentId]
+  );
+
+  const switchProject = async (id: string) => {
+    if (id === currentId) return;
+    try {
+      const full = await getProject(id);
+      setCurrentId(full.id);
+      setDesign({
+        rooms: full.data?.rooms ?? [],
+        assets: full.data?.assets ?? [],
+        blueprintImage: full.data?.blueprintImage ?? null,
+      });
+    } catch (e: any) {
+      showToast(e?.message || 'Could not open that project.', 'error');
+    }
+  };
+
+  const newProject = async () => {
+    if (!workspace) return;
+    const name = prompt('Name your new project:', 'Untitled Project');
+    if (!name) return;
+    try {
+      const created = await createProject(workspace.id, name, EMPTY_DESIGN);
+      setProjects((p) => [{ id: created.id, name: created.name, updated_at: created.updated_at }, ...p]);
+      setCurrentId(created.id);
+      setDesign(EMPTY_DESIGN);
+      showToast(`Created “${created.name}”.`);
+    } catch (e: any) {
+      showToast(e?.message || 'Could not create project.', 'error');
+    }
+  };
+
+  const signOut = () => supabase?.auth.signOut();
+
+  if (error) {
+    return (
+      <FullScreenMessage>
+        <div className="max-w-md text-center px-4">
+          <p className="text-rose-600 font-semibold mb-2">Could not load your workspace</p>
+          <p className="text-xs text-slate-500 mb-4">{error}</p>
+          <p className="text-[11px] text-slate-400">
+            Make sure the database migration in <code>supabase/migrations</code> has been applied.
+          </p>
+          <button onClick={signOut} className="mt-4 text-xs text-blue-600 font-semibold hover:underline">
+            Sign out
+          </button>
+        </div>
+      </FullScreenMessage>
+    );
+  }
+
+  if (!design || !currentId) {
+    return (
+      <FullScreenMessage>
+        <Loader2 className="w-4 h-4 animate-spin" /> Loading your projects…
+      </FullScreenMessage>
+    );
+  }
+
+  const header = (
+    <div className="flex items-center gap-2">
+      <div className="relative hidden sm:flex items-center">
+        <select
+          value={currentId}
+          onChange={(e) => switchProject(e.target.value)}
+          className="appearance-none text-sm font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg pl-3 pr-7 py-1.5 cursor-pointer hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200 max-w-[200px] truncate"
+          title="Switch project"
+        >
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 pointer-events-none" />
+      </div>
+      <button
+        type="button"
+        onClick={newProject}
+        className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all"
+        title="New project"
+      >
+        <Plus className="w-4 h-4" />
+      </button>
+      <div className="h-6 w-px bg-slate-200 mx-1 hidden md:block" />
+      <span className="text-xs text-slate-400 font-medium hidden lg:inline max-w-[160px] truncate" title={email}>
+        {email}
+      </span>
+      <button
+        type="button"
+        onClick={signOut}
+        className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-all"
+        title="Sign out"
+      >
+        <LogOut className="w-4 h-4" />
+      </button>
+    </div>
+  );
+
+  // Key the wrapper on the project id so switching projects remounts App with
+  // fresh state. (Keyed on an intrinsic element since the project has no
+  // @types/react to type `key` on custom components.) display:contents keeps
+  // the wrapper out of the layout so App's full-screen flex is unaffected.
+  return (
+    <div key={currentId} style={{ display: 'contents' }}>
+      <App initialDesign={design} onPersist={persist} headerSlot={header} />
+    </div>
+  );
+}

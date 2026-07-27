@@ -32,16 +32,36 @@ import {
   Download
 } from 'lucide-react';
 
-// Restore a previously autosaved design, falling back to the default layout.
-const persisted = typeof window !== 'undefined' ? loadDesign() : null;
-
 // Google Analytics measurement ID, configured via the VITE_GA_MEASUREMENT_ID
 // env var. When unset, analytics stays completely disabled.
 const GA_MEASUREMENT_ID = (import.meta as any).env?.VITE_GA_MEASUREMENT_ID as string | undefined;
 
-export default function App() {
-  const [rooms, setRooms] = useState<RoomDefinition[]>(persisted?.rooms ?? DEFAULT_ROOMS);
-  const [assets, setAssets] = useState<PlacedAsset[]>(persisted?.assets ?? DEFAULT_ASSETS);
+export interface AppDesign {
+  rooms: RoomDefinition[];
+  assets: PlacedAsset[];
+  blueprintImage: string | null;
+}
+
+export interface AppProps {
+  /** Initial design to load. Defaults to the localStorage autosave / seed layout. */
+  initialDesign?: AppDesign;
+  /** Persist callback (debounced autosave). Defaults to localStorage. */
+  onPersist?: (design: AppDesign) => void;
+  /** Optional header content injected into the top nav (SaaS user / project menu). */
+  headerSlot?: React.ReactNode;
+}
+
+export default function App({ initialDesign, onPersist, headerSlot }: AppProps = {}) {
+  // Local-mode fallback: restore the browser autosave or the seed layout.
+  const localPersisted = typeof window !== 'undefined' && !initialDesign ? loadDesign() : null;
+  const seed: AppDesign = initialDesign ?? {
+    rooms: localPersisted?.rooms ?? DEFAULT_ROOMS,
+    assets: localPersisted?.assets ?? DEFAULT_ASSETS,
+    blueprintImage: localPersisted?.blueprintImage ?? null,
+  };
+
+  const [rooms, setRooms] = useState<RoomDefinition[]>(seed.rooms);
+  const [assets, setAssets] = useState<PlacedAsset[]>(seed.assets);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
 
   // Snapshot function registered by ThreeCanvas for PNG exports.
@@ -312,7 +332,7 @@ export default function App() {
   };
 
   // Blueprint trace ground underlay states
-  const [blueprintImage, setBlueprintImage] = useState<string | null>(persisted?.blueprintImage ?? null);
+  const [blueprintImage, setBlueprintImage] = useState<string | null>(seed.blueprintImage);
   const [blueprintAspect, setBlueprintAspect] = useState<number>(1.33); // standard widescreen
   const [blueprintOpacity, setBlueprintOpacity] = useState<number>(0.5);
   const [blueprintScale, setBlueprintScale] = useState<number>(40); // default meter workspace width
@@ -321,11 +341,15 @@ export default function App() {
   const [blueprintVisible, setBlueprintVisible] = useState<boolean>(true);
   const [isDigitizing, setIsDigitizing] = useState<boolean>(false);
 
-  // Autosave the working design (debounced) so a refresh no longer wipes it.
+  // Autosave the working design (debounced). In SaaS mode this writes to the
+  // cloud via onPersist; in local mode it falls back to localStorage.
   useEffect(() => {
-    const handle = setTimeout(() => saveDesign(rooms, assets, blueprintImage), 600);
+    const handle = setTimeout(() => {
+      if (onPersist) onPersist({ rooms, assets, blueprintImage });
+      else saveDesign(rooms, assets, blueprintImage);
+    }, 600);
     return () => clearTimeout(handle);
-  }, [rooms, assets, blueprintImage]);
+  }, [rooms, assets, blueprintImage, onPersist]);
 
   const handleBlueprintLoaded = (image: string | null, aspect: number) => {
     setBlueprintImage(image);
@@ -451,7 +475,7 @@ export default function App() {
       setAssets([]);
       setBlueprintImage(null);
       setSelectedAssetId(null);
-      clearDesign();
+      if (!onPersist) clearDesign(); // local mode only; SaaS autosaves the empty design
     }
   };
 
@@ -610,7 +634,11 @@ export default function App() {
             ArchViz <span className="text-blue-600 underline decoration-2 underline-offset-4">Pro</span>
           </span>
           <div className="h-6 w-px bg-slate-200 mx-4"></div>
-          <span className="text-sm text-slate-500 font-medium hidden sm:inline">Project: HQ West Wing - Level 4</span>
+          {headerSlot ? (
+            headerSlot
+          ) : (
+            <span className="text-sm text-slate-500 font-medium hidden sm:inline">Project: HQ West Wing - Level 4</span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

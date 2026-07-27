@@ -19,6 +19,7 @@ export default defineConfig(() => {
           manualChunks: {
             three: ['three'],
             react: ['react', 'react-dom'],
+            supabase: ['@supabase/supabase-js'],
           },
         },
       },
