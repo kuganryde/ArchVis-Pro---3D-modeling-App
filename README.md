@@ -202,9 +202,32 @@ configured:
 4. Restart the dev server / rebuild. Users now sign up, and each design is saved
    to their workspace in the cloud.
 
-> The AI features remain BYOK in this slice (users supply their own Gemini key).
-> Hosted, metered, plan-gated AI + Stripe billing are the next milestone — see
-> [`docs/SAAS.md`](docs/SAAS.md).
+> The AI features remain BYOK (users supply their own Gemini key). Hosted,
+> metered AI is a future milestone — see [`docs/SAAS.md`](docs/SAAS.md).
+
+### Billing (Stripe subscriptions)
+
+Paid plans are handled by Stripe and are **optional** — leave the Stripe env
+vars empty and the app runs on the Free plan with no billing UI surfaced.
+
+1. In Stripe, create two recurring **Prices** (Pro and Team) and copy their IDs.
+2. Apply the billing migration
+   [`supabase/migrations/0002_billing.sql`](supabase/migrations/0002_billing.sql)
+   (adds the `subscriptions` table + RLS).
+3. Add a Stripe **webhook** → `https://<your-host>/api/stripe/webhook`
+   subscribed to `checkout.session.completed` and
+   `customer.subscription.created|updated|deleted`.
+4. Set the server env vars (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+   `STRIPE_PRICE_PRO`, `STRIPE_PRICE_TEAM`, `SUPABASE_SERVICE_ROLE_KEY`) — see
+   `.env.example` — and restart.
+
+The **Stripe secret key never reaches the browser**: Checkout and the billing
+portal are created server-side, and subscription state is written to the DB only
+from signature-verified webhooks. Billing requires the Node server (`npm run
+start`) — a static-only deploy can't process payments.
+
+> ⚠️ Billing endpoints live on the Express server, so a static-only host will
+> serve the app but can't run Checkout/webhooks.
 
 ---
 

@@ -11,6 +11,7 @@ import {
   classifyGeminiError,
   ClassifiedError,
 } from "./src/shared/geminiSpec";
+import { registerStripeWebhook, registerBillingRoutes, isBillingConfigured } from "./billing";
 
 dotenv.config();
 
@@ -19,9 +20,16 @@ const app = express();
 // to 3000 for local development.
 const PORT = Number(process.env.PORT) || 3000;
 
+// Stripe webhook must be registered with the RAW body, BEFORE the JSON parser,
+// so signature verification sees the exact bytes Stripe signed.
+registerStripeWebhook(app);
+
 // Increase JSON payload size limit for image uploads
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+// Billing (Checkout / portal / config) — JSON routes, safe to mount here.
+registerBillingRoutes(app);
 
 // Trim + basic sanity check on a user-supplied key so we can reject obviously
 // malformed input before spending a network round-trip on it.
@@ -172,7 +180,12 @@ app.post("/api/rebuild-from-prompt", async (req, res) => {
 
 // Lightweight health check for uptime monitors / container orchestrators.
 app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", uptime: process.uptime(), timestamp: new Date().toISOString() });
+  res.json({
+    status: "ok",
+    uptime: process.uptime(),
+    billing: isBillingConfigured(),
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // Configure Vite or Static server

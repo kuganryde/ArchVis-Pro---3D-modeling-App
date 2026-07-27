@@ -7,13 +7,16 @@
  *     <App /> wired to cloud persistence with a project switcher / user menu.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Loader2, Plus, LogOut, ChevronDown } from 'lucide-react';
+import { Loader2, Plus, LogOut, ChevronDown, Sparkles } from 'lucide-react';
 import App, { AppDesign } from '../App';
 import AuthScreen from './AuthScreen';
+import BillingModal from './BillingModal';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import { DEFAULT_ROOMS, DEFAULT_ASSETS } from '../data/defaultFloorPlan';
 import { showToast } from '../utils/toast';
+import { PlanId, maxProjectsForPlan } from '../shared/plans';
+import { getWorkspacePlan } from '../lib/billing';
 import {
   Workspace,
   ProjectSummary,
@@ -60,6 +63,8 @@ function WorkspaceView({ email }: { email: string }) {
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [design, setDesign] = useState<AppDesign | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [plan, setPlan] = useState<PlanId>('free');
+  const [showBilling, setShowBilling] = useState(false);
 
   // Bootstrap: workspace -> projects -> load (or seed) the first project.
   useEffect(() => {
@@ -86,6 +91,10 @@ function WorkspaceView({ email }: { email: string }) {
           assets: full.data?.assets ?? [],
           blueprintImage: full.data?.blueprintImage ?? null,
         });
+
+        // Load the workspace's current plan for gating + the header badge.
+        const wp = await getWorkspacePlan(ws.id);
+        if (active) setPlan(wp.plan);
       } catch (err: any) {
         if (active) setError(err?.message || 'Failed to load your workspace.');
       }
@@ -94,6 +103,33 @@ function WorkspaceView({ email }: { email: string }) {
       active = false;
     };
   }, []);
+
+  // After returning from Stripe Checkout, the webhook may lag a beat — re-check
+  // the plan a few times, then clean the ?billing= param from the URL.
+  useEffect(() => {
+    if (!workspace) return;
+    const params = new URLSearchParams(window.location.search);
+    const outcome = params.get('billing');
+    if (!outcome) return;
+
+    if (outcome === 'success') {
+      showToast('Payment received — activating your plan…', 'success');
+      let tries = 0;
+      const timer = setInterval(async () => {
+        tries += 1;
+        const wp = await getWorkspacePlan(workspace.id);
+        if (wp.plan !== 'free' || tries >= 5) {
+          setPlan(wp.plan);
+          clearInterval(timer);
+          if (wp.plan !== 'free') showToast(`You're now on the ${wp.plan} plan. 🎉`, 'success');
+        }
+      }, 2000);
+    } else if (outcome === 'cancelled') {
+      showToast('Checkout cancelled — no changes made.', 'info');
+    }
+    // Strip the query param without reloading.
+    window.history.replaceState({}, '', window.location.pathname);
+  }, [workspace]);
 
   const persist = useCallback(
     (d: AppDesign) => {
@@ -122,6 +158,15 @@ function WorkspaceView({ email }: { email: string }) {
 
   const newProject = async () => {
     if (!workspace) return;
+
+    // Enforce the plan's project limit (Free = 1). Nudge to upgrade instead.
+    const limit = maxProjectsForPlan(plan);
+    if (limit !== null && projects.length >= limit) {
+      showToast(`The ${plan} plan is limited to ${limit} project${limit === 1 ? '' : 's'}. Upgrade for unlimited.`, 'error');
+      setShowBilling(true);
+      return;
+    }
+
     const name = prompt('Name your new project:', 'Untitled Project');
     if (!name) return;
     try {
@@ -187,6 +232,24 @@ function WorkspaceView({ email }: { email: string }) {
       >
         <Plus className="w-4 h-4" />
       </button>
+
+      <div className="h-6 w-px bg-slate-200 mx-1 hidden md:block" />
+
+      {/* Plan badge + upgrade */}
+      <button
+        type="button"
+        onClick={() => setShowBilling(true)}
+        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all border ${
+          plan === 'free'
+            ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
+            : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
+        }`}
+        title="Plans & billing"
+      >
+        <Sparkles className="w-3.5 h-3.5" />
+        <span className="capitalize">{plan === 'free' ? 'Upgrade' : plan}</span>
+      </button>
+
       <div className="h-6 w-px bg-slate-200 mx-1 hidden md:block" />
       <span className="text-xs text-slate-400 font-medium hidden lg:inline max-w-[160px] truncate" title={email}>
         {email}
@@ -207,8 +270,13 @@ function WorkspaceView({ email }: { email: string }) {
   // @types/react to type `key` on custom components.) display:contents keeps
   // the wrapper out of the layout so App's full-screen flex is unaffected.
   return (
-    <div key={currentId} style={{ display: 'contents' }}>
-      <App initialDesign={design} onPersist={persist} headerSlot={header} />
-    </div>
+    <>
+      <div key={currentId} style={{ display: 'contents' }}>
+        <App initialDesign={design} onPersist={persist} headerSlot={header} />
+      </div>
+      {showBilling && workspace && (
+        <BillingModal workspaceId={workspace.id} currentPlan={plan} onClose={() => setShowBilling(false)} />
+      )}
+    </>
   );
 }

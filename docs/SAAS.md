@@ -26,18 +26,32 @@ in single-user local mode (localStorage), so nothing breaks for existing users.
 `src/hooks/useAuth.ts`, `src/components/AuthScreen.tsx`,
 `src/components/SaaSGate.tsx`, `supabase/migrations/0001_init.sql`.
 
-## Milestone 2 — monetization
+## Milestone 2 — monetization (Stripe billing shipped)
+
+**Stripe subscriptions (implemented).** Per-workspace subscriptions with plan
+gating, all env-gated so the app runs free/unbilled until Stripe is configured.
+
+- Plans (`src/shared/plans.ts`): **Free** (1 project), **Pro** ($39/mo,
+  unlimited), **Team** ($99/mo). Free-plan project limit is enforced in the UI.
+- Server (`billing.ts`): `/api/billing/config`, `/api/billing/checkout`
+  (subscription Checkout), `/api/billing/portal` (manage/cancel), and
+  `/api/stripe/webhook` (signature-verified). The Stripe secret key stays
+  server-side; JWTs are verified and only a workspace **owner** can manage billing.
+- DB (`supabase/migrations/0002_billing.sql`): `subscriptions` table, member
+  read-only RLS (writes come only from webhooks via the service-role key),
+  plus a `workspace_plan()` helper.
+- Client (`src/lib/billing.ts`, `src/components/BillingModal.tsx`): pricing
+  modal, upgrade → Checkout, manage → portal, plan badge in the header, and a
+  post-checkout plan refresh.
+
+**Still to do in this milestone:**
 
 - **Hosted, metered AI.** Move Gemini calls server-side behind auth, using a
   platform key; meter requests/tokens per plan and keep BYOK as a free/enterprise
   fallback. (Digitization on large images is the main COGS — cache aggressively.)
-- **Stripe billing.** Subscription tiers with usage-based AI credits:
-  - **Free** — 1 project, BYOK key, watermarked exports.
-  - **Pro** (~$29–49/user/mo) — unlimited projects, hosted AI credits, clean exports, BOM.
-  - **Team** (~$99+/mo) — collaboration, roles, shared asset library, SSO.
-  - **Enterprise** — self-host / BYOK, custom catalogs, SLA.
 - **Blueprint storage.** Move base64 blueprints out of the JSONB row into
   Supabase Storage (object storage) and reference by URL.
+- **Entitlements by plan** beyond project count (e.g. watermarked exports on Free).
 
 ## Milestone 3 — moat & expansion
 
