@@ -11,17 +11,11 @@ import { PlacedAsset, RoomDefinition } from './types';
 import { findContainingRoom, getDefaultHeight, isInfrastructureType, makeId } from './utils/geometry';
 import { mapApiLayout } from './utils/layout';
 import { saveDesign, loadDesign, clearDesign } from './utils/persistence';
-import { 
-  Building2, 
-  RefreshCw, 
-  HelpCircle, 
-  CheckCircle2, 
-  Moon, 
-  Sun, 
-  Layers, 
-  MapPin, 
+import { showToast } from './utils/toast';
+import {
+  RefreshCw,
+  HelpCircle,
   Sparkles,
-  BookmarkCheck,
   ChevronRight,
   Cpu,
   Layout,
@@ -373,13 +367,11 @@ export default function App() {
       setRooms(mappedRooms);
       setAssets(mappedAssets);
 
-      // Create browser notice toast
-      const toast = document.createElement('div');
-      toast.className = "fixed bottom-14 right-5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-emerald-400 z-50 flex items-center gap-1.5 animate-in slide-in-from-bottom-4 duration-300";
-      toast.innerHTML = `<span>✨ Digital Twin layout of ${mappedRooms.length} rooms and ${mappedAssets.length} nodes synthesized successfully!</span>`;
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 4500);
-
+      showToast(
+        `Digital Twin layout of ${mappedRooms.length} rooms and ${mappedAssets.length} nodes synthesized successfully.`,
+        'success',
+        { title: '✨ Blueprint digitized' }
+      );
     } catch (error: any) {
       console.error('Error digitizing blueprint:', error);
 
@@ -388,17 +380,12 @@ export default function App() {
         setShowApiKeyModal(true);
       }
 
-      // Render beautiful floating custom error toast rather than blocking iframe alerts
-      const toast = document.createElement('div');
-      toast.className = "fixed bottom-14 right-5 bg-gradient-to-r from-rose-600 to-red-600 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-red-400 z-50 flex flex-col gap-1 max-w-sm animate-in slide-in-from-bottom-4 duration-300";
-      toast.innerHTML = `
-        <div class="font-bold flex items-center gap-1.5 text-rose-100">
-          <span>⚠️ AI Digitizer Issue</span>
-        </div>
-        <p class="text-[11px] font-medium leading-relaxed">${error.message || 'Gemini is currently experiencing high demand. Retrying or trying again in a few moments usually resolves this.'}</p>
-      `;
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 6000);
+      showToast(
+        error.message ||
+          'Gemini is currently experiencing high demand. Trying again in a few moments usually resolves this.',
+        'error',
+        { title: '⚠️ AI Digitizer issue', durationMs: 6000 }
+      );
     } finally {
       setIsDigitizing(false);
     }
@@ -454,37 +441,21 @@ export default function App() {
       itemsToAdd.push({ type: 'cctv', x: cx, z: cz, specs: { model: 'AXIS 360 Mini', Lens: '2.8mm Wide-Angle' } });
     }
 
-    const newAssetsToAppend: PlacedAsset[] = itemsToAdd.map((item, idx) => {
-      const uid = `${item.type}_${Date.now().toString().slice(-4)}_${Math.floor(Math.random() * 1000 + idx)}`;
-      let category: 'infrastructure' | 'furniture' = 'furniture';
-      const isInfra = ['ap', 'dp', 'tp', 'cctv', 'door_access', 'intercom', 'power_outlet', 'hdmi_port', 'projector_port'].includes(item.type);
-      let height = (item.type === 'ap' || item.type === 'cctv') ? 3.2 : (isInfra ? 0.8 : 0.4);
-
-      if (isInfra) {
-        category = 'infrastructure';
-      }
-
-      return {
-        id: uid,
-        type: item.type as any,
-        category,
-        name: `${item.type.toUpperCase().replace('_', ' ')} (Parametric Group)`,
-        position: { x: item.x, y: height, z: item.z },
-        rotationY: item.rotation || 0,
-        scale: item.scale || { x: 1, y: 1, z: 1 },
-        assignedRoomId: roomId,
-        specs: item.specs || { Manufacturer: 'Standard BIM Family', Cost: '$150.00', Weight: '6 kg' }
-      };
-    });
+    const newAssetsToAppend: PlacedAsset[] = itemsToAdd.map((item) => ({
+      id: makeId(item.type),
+      type: item.type as any,
+      category: isInfrastructureType(item.type) ? 'infrastructure' : 'furniture',
+      name: `${item.type.toUpperCase().replace('_', ' ')} (Parametric Group)`,
+      position: { x: item.x, y: getDefaultHeight(item.type), z: item.z },
+      rotationY: item.rotation || 0,
+      scale: item.scale || { x: 1, y: 1, z: 1 },
+      assignedRoomId: roomId,
+      specs: item.specs || { Manufacturer: 'Standard BIM Family', Cost: '$150.00', Weight: '6 kg' },
+    }));
 
     setAssets((prev) => [...prev, ...newAssetsToAppend]);
 
-    // Fast feedback notification toast
-    const toast = document.createElement('div');
-    toast.className = "fixed bottom-14 right-5 bg-emerald-600 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-emerald-400 z-50 flex items-center gap-1.5 animate-in slide-in-from-bottom-4 duration-300";
-    toast.innerHTML = `<span>Applied functional setup blueprint! Nested ${newAssetsToAppend.length} specs-loaded nodes into ${room.name}!</span>`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 4000);
+    showToast(`Nested ${newAssetsToAppend.length} preconfigured nodes into ${room.name}.`);
   };
 
   // Reset CAD workspace to default image specifications
@@ -499,11 +470,15 @@ export default function App() {
   };
 
   const handleImportJSON = (json: any) => {
+    if (!json || (!Array.isArray(json.rooms) && !Array.isArray(json.assets))) {
+      showToast('That file does not look like a valid ArchViz Pro design.', 'error');
+      return;
+    }
     if (confirm('Importing will overwrite current design. Proceed?')) {
       if (json.rooms) setRooms(json.rooms);
       if (json.assets) setAssets(json.assets);
       if (json.blueprintImage) setBlueprintImage(json.blueprintImage);
-      alert('Design imported successfully.');
+      showToast('Design imported successfully.');
     }
   };
 
@@ -557,19 +532,6 @@ export default function App() {
 
   // Active highlighted item lookup for sidebar coordination
   const selectedAsset = assets.find((a) => a.id === selectedAssetId) || null;
-
-  // ---- Lightweight toast helper (replaces repeated inline DOM building) ----
-  const showToast = (message: string, tone: 'success' | 'error' = 'success') => {
-    const toast = document.createElement('div');
-    const palette =
-      tone === 'error'
-        ? 'from-rose-600 to-red-600 border-red-400'
-        : 'from-emerald-600 to-teal-600 border-emerald-400';
-    toast.className = `fixed bottom-14 right-5 bg-gradient-to-r ${palette} text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border z-[120] flex items-center gap-1.5 animate-in slide-in-from-bottom-4 duration-300 max-w-sm`;
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 4500);
-  };
 
   // ---- Real export actions used by the Share & Export modal ----
 

@@ -7,7 +7,9 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+// Respect the platform-provided port (Cloud Run, Heroku, etc.) and fall back
+// to 3000 for local development.
+const PORT = Number(process.env.PORT) || 3000;
 
 // Increase JSON payload size limit for image uploads
 app.use(express.json({ limit: "50mb" }));
@@ -351,6 +353,11 @@ app.post("/api/rebuild-from-prompt", async (req, res) => {
     const status = error instanceof GeminiRequestError ? error.status : 500;
     return res.status(status).json({ error: error?.message || "Failed to rebuild from prompt." });
   }
+});
+
+// Lightweight health check for uptime monitors / container orchestrators.
+app.get("/api/health", (_req, res) => {
+  res.json({ status: "ok", uptime: process.uptime(), timestamp: new Date().toISOString() });
 });
 
 // Configure Vite or Static server

@@ -1,18 +1,15 @@
 import React, { useState } from 'react';
-import { 
-  Building2, 
-  Cpu, 
-  Settings2, 
-  Layout, 
-  FileSpreadsheet, 
-  Database, 
-  Share2, 
-  Plus, 
-  Trash2, 
-  RotateCw, 
-  Search, 
+import {
+  Cpu,
+  Settings2,
+  Layout,
+  FileSpreadsheet,
+  Database,
+  Plus,
+  Trash2,
+  RotateCw,
+  Search,
   SlidersHorizontal,
-  Info,
   Wifi,
   Workflow,
   Hammer,
@@ -25,6 +22,7 @@ import {
 } from 'lucide-react';
 import { PlacedAsset, RoomDefinition } from '../types';
 import { isOverlapping, isAssetOutsideRooms } from '../utils/geometry';
+import { showToast } from '../utils/toast';
 
 interface CADSidebarProps {
   rooms: RoomDefinition[];
@@ -183,13 +181,7 @@ export default function CADSidebar({
             
             onBlueprintLoaded(dataUrl, aspect);
             setIsProcessingFile(false);
-
-            // Trigger feedback toast
-            const toast = document.createElement('div');
-            toast.className = "fixed bottom-14 right-5 bg-blue-600 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-blue-400 z-50 flex items-center gap-1.5 animate-in slide-in-from-bottom-4 duration-300";
-            toast.innerHTML = `<span>Rendered PDF Blueprint Page 1 successfully to 3D canvas ground!</span>`;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 4000);
+            showToast('Rendered PDF blueprint (page 1) onto the canvas floor.', 'info');
           } catch (err: any) {
             console.error(err);
             setFileError(err.message || 'Failed parsing PDF document.');
@@ -207,12 +199,7 @@ export default function CADSidebar({
             const aspect = img.width / img.height;
             onBlueprintLoaded(dataUrl, aspect);
             setIsProcessingFile(false);
-
-            const toast = document.createElement('div');
-            toast.className = "fixed bottom-14 right-5 bg-blue-600 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-blue-400 z-50 flex items-center gap-1.5 animate-in slide-in-from-bottom-4 duration-300";
-            toast.innerHTML = `<span>Uploaded Blueprint Image successfully to 3D canvas ground!</span>`;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 4000);
+            showToast('Uploaded blueprint image onto the canvas floor.', 'info');
           };
           img.onerror = () => {
             setFileError('Invalid image format uploaded.');
