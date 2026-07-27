@@ -83,8 +83,10 @@ export default function App() {
   }, []);
 
   const saveApiKey = (key: string) => {
-    setGeminiApiKey(key);
-    sessionStorage.setItem('gemini_api_key', key);
+    const cleaned = key.trim();
+    if (!cleaned) return;
+    setGeminiApiKey(cleaned);
+    sessionStorage.setItem('gemini_api_key', cleaned);
     setShowApiKeyModal(false);
     if (pendingAiAction) {
       pendingAiAction();
@@ -356,8 +358,10 @@ export default function App() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed scanning the uploaded blueprint file.');
+        const errorData = await response.json().catch(() => ({}));
+        const err = new Error(errorData.error || 'Failed scanning the uploaded blueprint file.');
+        (err as any).status = response.status;
+        throw err;
       }
 
       const data = await response.json();
@@ -378,7 +382,12 @@ export default function App() {
 
     } catch (error: any) {
       console.error('Error digitizing blueprint:', error);
-      
+
+      // If the key was rejected, reopen the key modal so the user can fix it.
+      if (error.status === 401 || error.status === 403) {
+        setShowApiKeyModal(true);
+      }
+
       // Render beautiful floating custom error toast rather than blocking iframe alerts
       const toast = document.createElement('div');
       toast.className = "fixed bottom-14 right-5 bg-gradient-to-r from-rose-600 to-red-600 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-red-400 z-50 flex flex-col gap-1 max-w-sm animate-in slide-in-from-bottom-4 duration-300";
@@ -517,7 +526,9 @@ export default function App() {
       });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to rebuild from prompt.');
+        const err = new Error(errorData.error || 'Failed to rebuild from prompt.');
+        (err as any).status = response.status;
+        throw err;
       }
 
       const data = await response.json();
@@ -532,8 +543,13 @@ export default function App() {
 
       setRooms(mappedRooms);
       setAssets(mappedAssets);
+      showToast(`Generated ${mappedRooms.length} rooms and ${mappedAssets.length} assets from your prompt.`);
     } catch (err: any) {
-      alert(err.message || 'Error processing prompt.');
+      // If the key was rejected, reopen the key modal so the user can fix it.
+      if (err.status === 401 || err.status === 403) {
+        setShowApiKeyModal(true);
+      }
+      showToast(err.message || 'Error processing prompt.', 'error');
     } finally {
       setIsDigitizing(false);
     }

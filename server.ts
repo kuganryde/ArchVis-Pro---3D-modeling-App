@@ -13,25 +13,114 @@ const PORT = 3000;
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-// Initialize Gemini SDK with recommended AI Studio headers
+// Trim + basic sanity check on a user-supplied key so we can reject obviously
+// malformed input before spending a network round-trip on it.
+const sanitizeKey = (key?: string): string | undefined => {
+  const trimmed = (key || "").trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+// Initialize the Gemini SDK client from either the per-request BYOK key or the
+// server-side env key.
 const getGeminiClient = (clientKey?: string) => {
-  const apiKey = clientKey || process.env.GEMINI_API_KEY;
+  const apiKey = sanitizeKey(clientKey) || sanitizeKey(process.env.GEMINI_API_KEY);
   if (!apiKey) {
-    console.warn("Warning: GEMINI_API_KEY is not set and no client key was provided. AI features might be restricted.");
+    console.warn("Warning: no Gemini API key provided (BYOK header or GEMINI_API_KEY).");
     return null;
   }
-  return new GoogleGenAI({
-    apiKey,
-    httpOptions: {
-      headers: {
-        "User-Agent": "aistudio-build",
-      },
-    },
-  });
+  return new GoogleGenAI({ apiKey });
 };
 
 // Helper delay function for exponential backoff retries
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+interface ClassifiedError {
+  status: number; // HTTP-ish status to relay to the client
+  message: string; // human-friendly, actionable message
+  retryable: boolean; // safe to retry the same model
+  tryNextModel: boolean; // model unavailable — fall back to another model
+}
+
+// Turn a raw Gemini/SDK error into a clean, actionable result. The SDK throws
+// an ApiError whose `.message` is a JSON string; we unwrap it so users see
+// "Your API key is invalid" instead of a nested blob, and so we never retry
+// errors that can never succeed (bad key, permission, bad request).
+const classifyGeminiError = (error: any): ClassifiedError => {
+  const rawStatus: number | undefined =
+    typeof error?.status === "number" ? error.status : undefined;
+
+  // Unwrap the nested { error: { code, message, status, details } } payload.
+  let inner: any = null;
+  try {
+    const parsed = typeof error?.message === "string" ? JSON.parse(error.message) : null;
+    inner = parsed?.error ?? parsed;
+  } catch {
+    inner = null;
+  }
+
+  const code: number | undefined = inner?.code ?? rawStatus;
+  const reason: string = inner?.status || inner?.details?.[0]?.reason || "";
+  const detail: string = inner?.message || error?.message || "Unknown error contacting Gemini.";
+
+  // Invalid / missing key.
+  if (code === 400 && /API_KEY_INVALID|api key not valid/i.test(`${reason} ${detail}`)) {
+    return {
+      status: 401,
+      message:
+        "Your Gemini API key is invalid. Open “Set API Key” and paste a valid key from Google AI Studio (it should start with “AIza”).",
+      retryable: false,
+      tryNextModel: false,
+    };
+  }
+  // Permission / API not enabled / key restrictions.
+  if (code === 401 || code === 403) {
+    return {
+      status: 403,
+      message:
+        "This Gemini API key was rejected. Make sure the Generative Language API is enabled for the key and that no HTTP-referrer/IP restrictions block server use.",
+      retryable: false,
+      tryNextModel: false,
+    };
+  }
+  // Model not found / not available for this key — worth trying the fallback model.
+  if (code === 404) {
+    return {
+      status: 404,
+      message: "The requested Gemini model is not available for this API key.",
+      retryable: false,
+      tryNextModel: true,
+    };
+  }
+  // Rate limit / quota — transient, safe to retry.
+  if (code === 429) {
+    return {
+      status: 429,
+      message: "Gemini rate limit or quota reached. Please wait a moment and try again.",
+      retryable: true,
+      tryNextModel: false,
+    };
+  }
+  // Other bad requests — do not retry (payload issue).
+  if (code === 400) {
+    return { status: 400, message: detail, retryable: false, tryNextModel: false };
+  }
+  // Server-side / transient (500, 502, 503, 504) or network error (no code).
+  return {
+    status: code && code >= 400 ? code : 503,
+    message: "Gemini is temporarily unavailable. Please try again in a moment.",
+    retryable: true,
+    tryNextModel: true,
+  };
+};
+
+// Error carrying the classified status so the route can relay it accurately.
+class GeminiRequestError extends Error {
+  status: number;
+  constructor(classified: ClassifiedError) {
+    super(classified.message);
+    this.status = classified.status;
+  }
+}
 
 // Candidate models in priority order. gemini-2.5-flash is the primary vision
 // model; gemini-2.5-flash-lite is the lighter/cheaper fallback.
@@ -82,15 +171,19 @@ const LAYOUT_RESPONSE_SCHEMA = {
   },
 };
 
-// Robust generation helper with per-model attempt retries and model fallback.
+// Generation helper with model fallback and *smart* retries: only transient
+// errors (rate limit, 5xx, network) are retried. Non-retryable errors — an
+// invalid key, permission denial, or a bad request — fail fast instead of
+// hammering the API for ~20s before surfacing the same message.
+const MAX_ATTEMPTS_PER_MODEL = 3;
+
 const generateLayoutWithRetry = async (ai: any, contents: any) => {
-  let lastError: any = null;
+  let lastClassified: ClassifiedError | null = null;
 
   for (const model of MODELS_TO_TRY) {
-    let attempts = 0;
-    while (attempts < 3) {
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS_PER_MODEL; attempt++) {
       try {
-        console.log(`AI Layout: Querying model ${model} (attempt ${attempts + 1}/3)...`);
+        console.log(`AI Layout: Querying model ${model} (attempt ${attempt}/${MAX_ATTEMPTS_PER_MODEL})...`);
         const response = await ai.models.generateContent({
           model,
           contents,
@@ -99,24 +192,39 @@ const generateLayoutWithRetry = async (ai: any, contents: any) => {
             responseSchema: LAYOUT_RESPONSE_SCHEMA,
           },
         });
-
         console.log(`AI Layout successfully parsed with model ${model}!`);
         return response;
       } catch (error: any) {
-        lastError = error;
-        console.warn(`AI Digitizer warning: Model ${model} returned error on attempt ${attempts + 1}:`, error.message || error);
-        
-        attempts++;
-        if (attempts < 3) {
-          const waitMs = Math.pow(2, attempts) * 1000 + Math.random() * 500;
-          console.log(`Waiting ${Math.round(waitMs)}ms to clear transient rate-limit/saturation bounds limit before retry...`);
+        const classified = classifyGeminiError(error);
+        lastClassified = classified;
+        console.warn(`AI Layout warning [${model}, attempt ${attempt}]: ${classified.message}`);
+
+        // Auth / bad-request errors will never succeed on any model — abort now.
+        if (!classified.retryable && !classified.tryNextModel) {
+          throw new GeminiRequestError(classified);
+        }
+        // Model unavailable — stop retrying this model, fall back to the next.
+        if (classified.tryNextModel && !classified.retryable) {
+          break;
+        }
+        // Transient — back off and retry the same model (unless out of attempts).
+        if (attempt < MAX_ATTEMPTS_PER_MODEL) {
+          const waitMs = Math.pow(2, attempt) * 1000 + Math.random() * 500;
+          console.log(`Transient error — waiting ${Math.round(waitMs)}ms before retry...`);
           await delay(waitMs);
         }
       }
     }
   }
-  
-  throw lastError || new Error("Failed to reach Gemini API after retrying multiple models.");
+
+  throw new GeminiRequestError(
+    lastClassified || {
+      status: 503,
+      message: "Failed to reach Gemini after retrying multiple models.",
+      retryable: false,
+      tryNextModel: false,
+    }
+  );
 };
 
 // API route to parse CAD blueprint / floor plans
@@ -201,8 +309,9 @@ app.post("/api/digitize-blueprint", async (req, res) => {
     const parsedData = JSON.parse(response.text || "{}");
     return res.json(parsedData);
   } catch (error: any) {
-    console.error("Error digitizing floorplan error endpoint:", error);
-    return res.status(500).json({ error: error.message || "Failed parsing floor plan." });
+    console.error("Error digitizing blueprint:", error?.message || error);
+    const status = error instanceof GeminiRequestError ? error.status : 500;
+    return res.status(status).json({ error: error?.message || "Failed to parse the floor plan." });
   }
 });
 
@@ -238,8 +347,9 @@ app.post("/api/rebuild-from-prompt", async (req, res) => {
 
     return res.json(JSON.parse(response.text || "{}"));
   } catch (error: any) {
-    console.error("Error rebuilding from prompt:", error);
-    return res.status(500).json({ error: error.message });
+    console.error("Error rebuilding from prompt:", error?.message || error);
+    const status = error instanceof GeminiRequestError ? error.status : 500;
+    return res.status(status).json({ error: error?.message || "Failed to rebuild from prompt." });
   }
 });
 
