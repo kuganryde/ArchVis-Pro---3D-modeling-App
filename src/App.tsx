@@ -12,6 +12,7 @@ import { findContainingRoom, getDefaultHeight, isInfrastructureType, makeId } fr
 import { mapApiLayout } from './utils/layout';
 import { saveDesign, loadDesign, clearDesign } from './utils/persistence';
 import { showToast } from './utils/toast';
+import { digitizeBlueprintClient, rebuildFromPromptClient } from './utils/gemini';
 import {
   RefreshCw,
   HelpCircle,
@@ -342,23 +343,8 @@ export default function App() {
 
     setIsDigitizing(true);
     try {
-      const response = await fetch('/api/digitize-blueprint', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-gemini-api-key': geminiApiKey,
-        },
-        body: JSON.stringify({ base64Data, mimeType }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const err = new Error(errorData.error || 'Failed scanning the uploaded blueprint file.');
-        (err as any).status = response.status;
-        throw err;
-      }
-
-      const data = await response.json();
+      // BYOK: call Gemini directly from the browser (no backend required).
+      const data = await digitizeBlueprintClient(geminiApiKey, base64Data, mimeType);
 
       // Normalise the loosely-typed AI payload into strongly-typed state.
       const { rooms: mappedRooms, assets: mappedAssets } = mapApiLayout(data);
@@ -491,22 +477,8 @@ export default function App() {
 
     setIsDigitizing(true);
     try {
-      const response = await fetch('/api/rebuild-from-prompt', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-gemini-api-key': geminiApiKey,
-        },
-        body: JSON.stringify({ prompt }),
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const err = new Error(errorData.error || 'Failed to rebuild from prompt.');
-        (err as any).status = response.status;
-        throw err;
-      }
-
-      const data = await response.json();
+      // BYOK: call Gemini directly from the browser (no backend required).
+      const data = await rebuildFromPromptClient(geminiApiKey, prompt);
 
       // Use the same normalisation pipeline as the digitizer so assets are
       // correctly typed, positioned and auto-bound to their rooms.
@@ -912,7 +884,7 @@ export default function App() {
                   <p>By entering your Gemini API key, you understand and agree to the following conditions:</p>
                   <ul className="list-disc pl-4 space-y-1">
                     <li><strong>Temporary Session Storage:</strong> Your key is securely stored in your browser's temporary <code className="bg-amber-100 px-1 py-0.5 rounded">sessionStorage</code>. It will be <strong>automatically and permanently deleted</strong> the moment you close this browser tab or window.</li>
-                    <li><strong>No Server Persistence:</strong> Your key is NEVER stored in any database or file system on the server. We only proxy it directly to Google's API during your active session.</li>
+                    <li><strong>Direct to Google:</strong> Your key is sent straight from your browser to Google's Gemini API. It never touches our servers or any database.</li>
                     <li><strong>Key Billing:</strong> All usage is billed directly to your own Google Cloud / Google AI Studio account limits and quotas.</li>
                     <li><strong>Key Handling:</strong> Never share a generic account key. Always generate a dedicated key constrained to Gemini features, and revoke it when you are done if preferred.</li>
                   </ul>
