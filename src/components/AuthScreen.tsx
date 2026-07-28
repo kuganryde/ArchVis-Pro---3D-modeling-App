@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { Mail, Lock, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Logo from './Logo';
+import LegalModal from './LegalModal';
 
 export default function AuthScreen() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
@@ -15,6 +16,7 @@ export default function AuthScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [legalTab, setLegalTab] = useState<string | null>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,7 +159,21 @@ export default function AuthScreen() {
             </p>
           </form>
         </div>
+
+        <p className="text-center text-[10px] text-slate-500 mt-4 leading-relaxed">
+          By continuing you agree to our{' '}
+          <button type="button" onClick={() => setLegalTab('terms')} className="text-cyan-400 hover:underline">
+            Terms
+          </button>{' '}
+          and{' '}
+          <button type="button" onClick={() => setLegalTab('privacy')} className="text-cyan-400 hover:underline">
+            Privacy Policy
+          </button>
+          .
+        </p>
       </div>
+
+      {legalTab && <LegalModal initialTab={legalTab} onClose={() => setLegalTab(null)} />}
     </div>
   );
 }

@@ -13,6 +13,7 @@ import { mapApiLayout } from './utils/layout';
 import { saveDesign, loadDesign, clearDesign } from './utils/persistence';
 import { showToast } from './utils/toast';
 import Logo, { Wordmark } from './components/Logo';
+import LegalModal from './components/LegalModal';
 import { computeBom, formatMoney } from './utils/bom';
 import { watermarkPng } from './utils/watermark';
 import { PlanId, allowsCleanExports } from './shared/plans';
@@ -137,6 +138,9 @@ export default function App({
 
   // Interactive help tour state
   const [showTutorial, setShowTutorial] = useState(true);
+
+  // Legal Center (footer links) — holds the active policy tab or null.
+  const [legalTab, setLegalTab] = useState<string | null>(null);
 
   // Tab state synced with high-contrast vertical bento rail
   const [activeTab, setActiveTab] = useState<'library' | 'rooms' | 'reports'>('library');
@@ -1127,12 +1131,23 @@ export default function App({
 
       {/* 3. Sleek Architectural Footer */}
       <footer className="h-10 bg-white border-t border-slate-200 px-6 flex items-center justify-between text-[10px] text-slate-400 font-medium shrink-0">
-        <div>RENDER ENGINE: <strong>WEBGL CORE v2.4</strong></div>
+        <div className="flex items-center gap-3">
+          <span className="hidden md:inline">© {new Date().getFullYear()} ArchViz Pro</span>
+          <button type="button" onClick={() => setLegalTab('terms')} className="hover:text-cyan-600 transition-colors">Terms</button>
+          <span className="text-slate-300">·</span>
+          <button type="button" onClick={() => setLegalTab('privacy')} className="hover:text-cyan-600 transition-colors">Privacy</button>
+          <span className="text-slate-300">·</span>
+          <button type="button" onClick={() => setLegalTab('billing')} className="hover:text-cyan-600 transition-colors hidden sm:inline">Refunds</button>
+          <span className="text-slate-300 hidden sm:inline">·</span>
+          <button type="button" onClick={() => setLegalTab('cookies')} className="hover:text-cyan-600 transition-colors">Cookies</button>
+        </div>
         <div className="flex items-center gap-4">
-          <span>SCALE: 1:50</span>
-          <span>GRID_SNAP: 25cm</span>
+          <span className="hidden sm:inline">SCALE: 1:50</span>
+          <span className="hidden md:inline">GRID_SNAP: 25cm</span>
         </div>
       </footer>
+
+      {legalTab && <LegalModal initialTab={legalTab} onClose={() => setLegalTab(null)} />}
     </div>
   );
 }
