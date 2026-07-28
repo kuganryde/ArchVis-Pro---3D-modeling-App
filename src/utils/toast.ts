@@ -8,7 +8,7 @@ export type ToastTone = 'success' | 'error' | 'info';
 const TONE_CLASSES: Record<ToastTone, string> = {
   success: 'from-emerald-600 to-teal-600 border-emerald-400',
   error: 'from-rose-600 to-red-600 border-red-400',
-  info: 'from-violet-600 to-purple-600 border-violet-400',
+  info: 'from-cyan-600 to-teal-600 border-cyan-400',
 };
 
 /**

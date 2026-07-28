@@ -55,7 +55,7 @@ export default function BillingModal({ workspaceId, currentPlan, onClose }: Bill
       <div className="bg-white max-w-3xl w-full rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center shadow-inner">
+            <div className="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-600 flex items-center justify-center shadow-inner">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
@@ -82,7 +82,7 @@ export default function BillingModal({ workspaceId, currentPlan, onClose }: Bill
             {usage.limit != null && (
               <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
                 <div
-                  className="h-full bg-violet-500 rounded-full transition-all"
+                  className="h-full bg-cyan-500 rounded-full transition-all"
                   style={{ width: `${Math.min(100, ((usage.used ?? 0) / usage.limit) * 100)}%` }}
                 />
               </div>
@@ -108,7 +108,7 @@ export default function BillingModal({ workspaceId, currentPlan, onClose }: Bill
                   <div
                     key={p.id}
                     className={`rounded-2xl border p-5 flex flex-col ${
-                      isCurrent ? 'border-violet-400 ring-2 ring-violet-100 bg-violet-50/30' : 'border-slate-200'
+                      isCurrent ? 'border-cyan-400 ring-2 ring-cyan-100 bg-cyan-50/30' : 'border-slate-200'
                     }`}
                   >
                     <div className="mb-3">

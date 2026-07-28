@@ -310,7 +310,7 @@ function WorkspaceView({ userId, email }: { userId: string; email: string }) {
           <p className="text-[11px] text-slate-400">
             Make sure the database migration in <code>supabase/migrations</code> has been applied.
           </p>
-          <button onClick={signOut} className="mt-4 text-xs text-violet-600 font-semibold hover:underline">
+          <button onClick={signOut} className="mt-4 text-xs text-cyan-600 font-semibold hover:underline">
             Sign out
           </button>
         </div>
@@ -334,7 +334,7 @@ function WorkspaceView({ userId, email }: { userId: string; email: string }) {
           <select
             value={workspace?.id || ''}
             onChange={(e) => switchWorkspace(e.target.value)}
-            className="appearance-none text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-lg pl-3 pr-7 py-1.5 cursor-pointer hover:bg-violet-100 focus:outline-none focus:ring-2 focus:ring-violet-200 max-w-[170px] truncate"
+            className="appearance-none text-xs font-semibold text-cyan-700 bg-cyan-50 border border-cyan-200 rounded-lg pl-3 pr-7 py-1.5 cursor-pointer hover:bg-cyan-100 focus:outline-none focus:ring-2 focus:ring-cyan-200 max-w-[170px] truncate"
             title="Switch workspace"
           >
             {workspaces.map((w) => (
@@ -343,7 +343,7 @@ function WorkspaceView({ userId, email }: { userId: string; email: string }) {
               </option>
             ))}
           </select>
-          <ChevronDown className="w-3.5 h-3.5 text-violet-400 absolute right-2 pointer-events-none" />
+          <ChevronDown className="w-3.5 h-3.5 text-cyan-400 absolute right-2 pointer-events-none" />
         </div>
       )}
 
@@ -351,7 +351,7 @@ function WorkspaceView({ userId, email }: { userId: string; email: string }) {
         <select
           value={currentId}
           onChange={(e) => switchProject(e.target.value)}
-          className="appearance-none text-sm font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg pl-3 pr-7 py-1.5 cursor-pointer hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-200 max-w-[200px] truncate"
+          className="appearance-none text-sm font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg pl-3 pr-7 py-1.5 cursor-pointer hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-200 max-w-[200px] truncate"
           title="Switch project"
         >
           {projects.map((p) => (
@@ -365,7 +365,7 @@ function WorkspaceView({ userId, email }: { userId: string; email: string }) {
       <button
         type="button"
         onClick={newProject}
-        className="p-1.5 rounded-lg text-slate-500 hover:text-violet-600 hover:bg-violet-50 transition-all"
+        className="p-1.5 rounded-lg text-slate-500 hover:text-cyan-600 hover:bg-cyan-50 transition-all"
         title="New project"
       >
         <Plus className="w-4 h-4" />
@@ -374,7 +374,7 @@ function WorkspaceView({ userId, email }: { userId: string; email: string }) {
       <button
         type="button"
         onClick={() => setShowTeam(true)}
-        className="p-1.5 rounded-lg text-slate-500 hover:text-violet-600 hover:bg-violet-50 transition-all"
+        className="p-1.5 rounded-lg text-slate-500 hover:text-cyan-600 hover:bg-cyan-50 transition-all"
         title="Team & invitations"
       >
         <Users className="w-4 h-4" />

@@ -1,6 +1,6 @@
 {
-  "name": "Office 3D Floor Planner and Asset Manager",
-  "description": "An immersive 3D CAD office floor planner and low-current asset manager featuring interactive furniture layouts, dragging controls, real-time reporting, and custom Zoho Creator integration.",
+  "name": "ArchViz Pro — AI Digital Twin Platform",
+  "description": "ArchViz Pro is an AI-powered 3D digital-twin platform for office floor plans and low-current (network / AV) infrastructure — interactive layouts, Wi-Fi & occupancy overlays, AI blueprint digitization, bill of materials, and team workspaces.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

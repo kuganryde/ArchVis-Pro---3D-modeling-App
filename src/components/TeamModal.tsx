@@ -29,7 +29,7 @@ interface TeamModalProps {
 }
 
 const roleBadge: Record<Role, string> = {
-  owner: 'bg-violet-100 text-violet-700',
+  owner: 'bg-cyan-100 text-cyan-700',
   admin: 'bg-blue-100 text-blue-700',
   member: 'bg-slate-100 text-slate-600',
 };
@@ -123,7 +123,7 @@ export default function TeamModal({ workspaceId, myUserId, myRole, myEmail, onCl
       <div className="bg-white max-w-lg w-full rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[85vh]">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-2xl">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center shadow-inner">
+            <div className="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-600 flex items-center justify-center shadow-inner">
               <Users className="w-5 h-5" />
             </div>
             <div>
@@ -145,8 +145,8 @@ export default function TeamModal({ workspaceId, myUserId, myRole, myEmail, onCl
             <>
               {/* Invitations addressed to me */}
               {myInvites.length > 0 && (
-                <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-3 space-y-2">
-                  <div className="text-xs font-bold text-violet-700">Invitations for you</div>
+                <div className="rounded-xl border border-cyan-200 bg-cyan-50/50 p-3 space-y-2">
+                  <div className="text-xs font-bold text-cyan-700">Invitations for you</div>
                   {myInvites.map((i) => (
                     <div key={i.id} className="flex items-center justify-between text-xs">
                       <span className="text-slate-700">
@@ -221,7 +221,7 @@ export default function TeamModal({ workspaceId, myUserId, myRole, myEmail, onCl
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="teammate@company.com"
-                        className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-slate-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-200"
+                        className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-slate-200 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200"
                         required
                       />
                     </div>
