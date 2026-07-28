@@ -725,7 +725,7 @@ export default function App({
           <button
             type="button"
             onClick={handleResetCanvas}
-            className="px-3 py-1.5 rounded-lg bg-white/95 text-[11px] font-semibold text-rose-600 hover:text-rose-700 shadow-sm border border-slate-200 transition-all flex items-center gap-1.5 cursor-pointer hover:bg-slate-50 focus:outline-none"
+            className="av-btn av-btn-danger av-btn-sm"
             title="Reset Workspace"
           >
             <RefreshCw className="w-3.5 h-3.5" />
@@ -735,21 +735,17 @@ export default function App({
           <button
             type="button"
             onClick={() => setShowApiKeyModal(true)}
-            className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all border flex items-center gap-1.5 cursor-pointer focus:outline-none ${
-              geminiApiKey 
-              ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 shadow-sm' 
-              : 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 shadow-sm animate-pulse'
-            }`}
+            className={`av-btn av-btn-secondary av-btn-sm ${geminiApiKey ? '' : 'animate-pulse'}`}
             title="Configure Gemini API Key"
           >
-            <Key className="w-3.5 h-3.5" />
+            <Key className={`w-3.5 h-3.5 ${geminiApiKey ? 'text-blue-600' : 'text-amber-600'}`} />
             <span className="hidden xl:inline">{geminiApiKey ? 'API Key Active' : 'Set API Key'}</span>
           </button>
 
           <button
             type="button"
             onClick={() => setShowShareModal(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-md hover:shadow-lg hover:shadow-blue-200 transition-all flex items-center gap-2 cursor-pointer focus:outline-none"
+            className="av-btn av-btn-primary av-btn-sm"
           >
             <Share2 className="w-4 h-4" />
             <span>Share & Export</span>
@@ -917,7 +913,7 @@ export default function App({
                 <button
                   type="button"
                   onClick={() => setShowTutorial(false)}
-                  className="bg-blue-600 hover:bg-blue-700 text-xs font-semibold text-white px-5 py-2 rounded-lg shadow-md cursor-pointer transition-all flex items-center gap-1 focus:outline-none"
+                  className="av-btn av-btn-primary av-btn-sm"
                 >
                   <span>Launch CAD Workspace</span>
                   <ChevronRight className="w-4 h-4" />
@@ -980,21 +976,21 @@ export default function App({
             </div>
 
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-              <button 
+              <button
                 onClick={() => {
                   setShowApiKeyModal(false);
                   setPendingAiAction(null);
                 }}
-                className="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-200 transition-all"
+                className="av-btn av-btn-secondary text-sm"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={() => {
                   const val = (document.getElementById('gemini-key-input') as HTMLInputElement).value.trim();
                   if (val) saveApiKey(val);
                 }}
-                className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+                className="av-btn av-btn-primary text-sm"
               >
                 <Save className="w-4 h-4" />
                 Accept Terms & Save Session Key
@@ -1107,9 +1103,9 @@ export default function App({
             </div>
             
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-              <button 
+              <button
                 onClick={() => setShowShareModal(false)}
-                className="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 transition-all shadow-sm"
+                className="av-btn av-btn-secondary text-sm"
               >
                 Close Window
               </button>

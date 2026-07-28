@@ -299,11 +299,7 @@ function WorkspaceView({ email }: { email: string }) {
       <button
         type="button"
         onClick={() => setShowBilling(true)}
-        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all border ${
-          plan === 'free'
-            ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
-            : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
-        }`}
+        className={plan === 'free' ? 'av-btn av-btn-primary av-btn-sm' : 'av-btn av-btn-secondary av-btn-sm'}
         title="Plans & billing"
       >
         <Sparkles className="w-3.5 h-3.5" />

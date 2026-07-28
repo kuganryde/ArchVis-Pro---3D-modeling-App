@@ -115,11 +115,7 @@ export default function AuthScreen() {
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={busy}
-            className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2"
-          >
+          <button type="submit" disabled={busy} className="av-btn av-btn-primary text-sm w-full">
             {busy && <Loader2 className="w-4 h-4 animate-spin" />}
             {mode === 'signin' ? 'Sign In' : 'Create Account'}
           </button>

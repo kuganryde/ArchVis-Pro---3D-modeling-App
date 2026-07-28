@@ -138,7 +138,7 @@ export default function BillingModal({ workspaceId, currentPlan, onClose }: Bill
                         <button
                           onClick={manage}
                           disabled={busy !== null}
-                          className="w-full py-2 rounded-xl text-xs font-bold border border-slate-300 text-slate-700 hover:bg-slate-100 transition-all flex items-center justify-center gap-2"
+                          className="av-btn av-btn-secondary av-btn-sm w-full"
                         >
                           {busy === 'portal' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                           Manage billing
@@ -148,7 +148,7 @@ export default function BillingModal({ workspaceId, currentPlan, onClose }: Bill
                       <button
                         onClick={() => upgrade(p.id)}
                         disabled={busy !== null}
-                        className="w-full py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-all flex items-center justify-center gap-2"
+                        className="av-btn av-btn-primary av-btn-sm w-full"
                       >
                         {busy === p.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                         Upgrade to {p.name}
