@@ -44,14 +44,28 @@ gating, all env-gated so the app runs free/unbilled until Stripe is configured.
   modal, upgrade → Checkout, manage → portal, plan badge in the header, and a
   post-checkout plan refresh.
 
+**Hosted, metered AI (implemented).** When the platform `GEMINI_API_KEY` is set,
+signed-in users without their own key get AI generations server-side, metered per
+workspace against the plan's monthly allowance (Free 5, Pro 200, Team unlimited).
+BYOK remains the unmetered fallback (billed to the user, called direct from the
+browser).
+
+- Server (`aiMetering.ts`): `POST /api/ai/digitize`, `POST /api/ai/rebuild`
+  (auth + membership + plan-limit gated), `GET /api/ai/usage`. Over-limit returns
+  `402` with an upgrade prompt; credit is consumed only on a successful generation.
+- DB (`supabase/migrations/0003_ai_usage.sql`): `ai_usage` table (per workspace /
+  month) + atomic `increment_ai_usage()` RPC; member-read RLS.
+- Shared server helpers extracted to `serverSupabase.ts` (JWT/membership) and
+  `serverGemini.ts` (generation), reused by billing and metering.
+- Client routes AI to hosted vs BYOK automatically; `BillingModal` shows a
+  monthly credits meter.
+
 **Still to do in this milestone:**
 
-- **Hosted, metered AI.** Move Gemini calls server-side behind auth, using a
-  platform key; meter requests/tokens per plan and keep BYOK as a free/enterprise
-  fallback. (Digitization on large images is the main COGS — cache aggressively.)
 - **Blueprint storage.** Move base64 blueprints out of the JSONB row into
   Supabase Storage (object storage) and reference by URL.
-- **Entitlements by plan** beyond project count (e.g. watermarked exports on Free).
+- **Entitlements by plan** beyond project/AI limits (e.g. watermarked exports on Free).
+- **Caching** of AI digitization results (large images are the main COGS).
 
 ## Milestone 3 — moat & expansion
 

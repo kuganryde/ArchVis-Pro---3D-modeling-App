@@ -272,7 +272,13 @@ function WorkspaceView({ email }: { email: string }) {
   return (
     <>
       <div key={currentId} style={{ display: 'contents' }}>
-        <App initialDesign={design} onPersist={persist} headerSlot={header} />
+        <App
+          initialDesign={design}
+          onPersist={persist}
+          headerSlot={header}
+          hostedAiWorkspaceId={workspace?.id}
+          onUpgradeNeeded={() => setShowBilling(true)}
+        />
       </div>
       {showBilling && workspace && (
         <BillingModal workspaceId={workspace.id} currentPlan={plan} onClose={() => setShowBilling(false)} />

@@ -11,6 +11,7 @@ import {
   startCheckout,
   openBillingPortal,
 } from '../lib/billing';
+import { getAiUsage, AiUsage } from '../lib/aiHosted';
 import { showToast } from '../utils/toast';
 
 interface BillingModalProps {
@@ -21,11 +22,13 @@ interface BillingModalProps {
 
 export default function BillingModal({ workspaceId, currentPlan, onClose }: BillingModalProps) {
   const [config, setConfig] = useState<BillingConfig | null>(null);
+  const [usage, setUsage] = useState<AiUsage | null>(null);
   const [busy, setBusy] = useState<PlanId | 'portal' | null>(null);
 
   useEffect(() => {
     fetchBillingConfig().then(setConfig);
-  }, []);
+    getAiUsage(workspaceId).then(setUsage);
+  }, [workspaceId]);
 
   const upgrade = async (plan: PlanId) => {
     setBusy(plan);
@@ -66,6 +69,26 @@ export default function BillingModal({ workspaceId, currentPlan, onClose }: Bill
             <X className="w-4 h-4" />
           </button>
         </div>
+
+        {usage?.enabled && (
+          <div className="px-6 pt-4 -mb-2">
+            <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 mb-1">
+              <span>Hosted AI generations this month</span>
+              <span className="font-mono">
+                {usage.used ?? 0}
+                {usage.limit === null || usage.limit === undefined ? ' (unlimited)' : ` / ${usage.limit}`}
+              </span>
+            </div>
+            {usage.limit != null && (
+              <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                <div
+                  className="h-full bg-blue-500 rounded-full transition-all"
+                  style={{ width: `${Math.min(100, ((usage.used ?? 0) / usage.limit) * 100)}%` }}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="p-6">
           {!config ? (

@@ -15,23 +15,17 @@
 import type { Express, Request, Response } from "express";
 import express from "express";
 import Stripe from "stripe";
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { PLANS, PlanId } from "./src/shared/plans";
+import { admin, isAdminConfigured, getUserFromRequest, assertWorkspaceOwner } from "./serverSupabase";
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
-const admin: SupabaseClient | null =
-  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
-    : null;
 
 /** Billing works only when Stripe + the Supabase service client + a Pro price exist. */
 export const isBillingConfigured = (): boolean =>
-  Boolean(stripe && admin && process.env[PLANS.pro.priceEnv as string]);
+  Boolean(stripe && isAdminConfigured() && process.env[PLANS.pro.priceEnv as string]);
 
 /** Stripe price ID configured for a paid plan, if any. */
 function priceIdForPlan(plan: PlanId): string | undefined {
@@ -45,29 +39,6 @@ function planForPriceId(priceId: string | undefined): PlanId {
   if (priceId === process.env[PLANS.pro.priceEnv as string]) return "pro";
   if (priceId === process.env[PLANS.team.priceEnv as string]) return "team";
   return "free";
-}
-
-/** Verify the Supabase JWT on the request and return the user (or null). */
-async function getUser(req: Request) {
-  if (!admin) return null;
-  const header = req.headers.authorization || "";
-  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
-  if (!token) return null;
-  const { data, error } = await admin.auth.getUser(token);
-  if (error) return null;
-  return data.user;
-}
-
-/** Confirm the user OWNS the workspace (only owners manage billing). */
-async function assertWorkspaceOwner(workspaceId: string, userId: string): Promise<boolean> {
-  if (!admin) return false;
-  const { data, error } = await admin
-    .from("workspaces")
-    .select("owner_id")
-    .eq("id", workspaceId)
-    .single();
-  if (error || !data) return false;
-  return data.owner_id === userId;
 }
 
 /** Base URL for Stripe redirect links. */
@@ -186,7 +157,7 @@ export function registerBillingRoutes(app: Express) {
     if (!stripe || !isBillingConfigured()) {
       return res.status(503).json({ error: "Billing is not configured on this server." });
     }
-    const user = await getUser(req);
+    const user = await getUserFromRequest(req);
     if (!user) return res.status(401).json({ error: "You must be signed in." });
 
     const { workspaceId, plan } = req.body as { workspaceId?: string; plan?: PlanId };
@@ -242,7 +213,7 @@ export function registerBillingRoutes(app: Express) {
     if (!stripe || !isBillingConfigured()) {
       return res.status(503).json({ error: "Billing is not configured on this server." });
     }
-    const user = await getUser(req);
+    const user = await getUserFromRequest(req);
     if (!user) return res.status(401).json({ error: "You must be signed in." });
 
     const { workspaceId } = req.body as { workspaceId?: string };

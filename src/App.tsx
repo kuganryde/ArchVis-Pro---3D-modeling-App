@@ -13,6 +13,7 @@ import { mapApiLayout } from './utils/layout';
 import { saveDesign, loadDesign, clearDesign } from './utils/persistence';
 import { showToast } from './utils/toast';
 import { digitizeBlueprintClient, rebuildFromPromptClient } from './utils/gemini';
+import { digitizeBlueprintHosted, rebuildFromPromptHosted } from './lib/aiHosted';
 import {
   RefreshCw,
   HelpCircle,
@@ -49,9 +50,19 @@ export interface AppProps {
   onPersist?: (design: AppDesign) => void;
   /** Optional header content injected into the top nav (SaaS user / project menu). */
   headerSlot?: React.ReactNode;
+  /** When set (SaaS mode), AI without a BYOK key routes through hosted/metered endpoints for this workspace. */
+  hostedAiWorkspaceId?: string;
+  /** Called when hosted AI hits the plan's monthly limit (402), to prompt an upgrade. */
+  onUpgradeNeeded?: () => void;
 }
 
-export default function App({ initialDesign, onPersist, headerSlot }: AppProps = {}) {
+export default function App({
+  initialDesign,
+  onPersist,
+  headerSlot,
+  hostedAiWorkspaceId,
+  onUpgradeNeeded,
+}: AppProps = {}) {
   // Local-mode fallback: restore the browser autosave or the seed layout.
   const localPersisted = typeof window !== 'undefined' && !initialDesign ? loadDesign() : null;
   const seed: AppDesign = initialDesign ?? {
@@ -359,7 +370,9 @@ export default function App({ initialDesign, onPersist, headerSlot }: AppProps =
   };
 
   const handleDigitizeBlueprint = async (base64Data: string, mimeType: string) => {
-    if (!geminiApiKey) {
+    // AI routing: BYOK key -> direct browser call (unmetered); else, in SaaS
+    // mode, hosted/metered endpoint; else prompt for a key.
+    if (!geminiApiKey && !hostedAiWorkspaceId) {
       setPendingAiAction(() => () => handleDigitizeBlueprint(base64Data, mimeType));
       setShowApiKeyModal(true);
       return;
@@ -367,8 +380,9 @@ export default function App({ initialDesign, onPersist, headerSlot }: AppProps =
 
     setIsDigitizing(true);
     try {
-      // BYOK: call Gemini directly from the browser (no backend required).
-      const data = await digitizeBlueprintClient(geminiApiKey, base64Data, mimeType);
+      const data = geminiApiKey
+        ? await digitizeBlueprintClient(geminiApiKey, base64Data, mimeType)
+        : await digitizeBlueprintHosted(hostedAiWorkspaceId as string, base64Data, mimeType);
 
       // Normalise the loosely-typed AI payload into strongly-typed state.
       const { rooms: mappedRooms, assets: mappedAssets } = mapApiLayout(data);
@@ -385,9 +399,12 @@ export default function App({ initialDesign, onPersist, headerSlot }: AppProps =
     } catch (error: any) {
       console.error('Error digitizing blueprint:', error);
 
-      // If the key was rejected, reopen the key modal so the user can fix it.
-      if (error.status === 401 || error.status === 403) {
-        setShowApiKeyModal(true);
+      // Plan limit reached on hosted AI → prompt an upgrade.
+      if (error.status === 402) {
+        onUpgradeNeeded?.();
+      } else if (error.status === 401 || error.status === 403) {
+        // Key rejected (BYOK) → reopen the key modal so the user can fix it.
+        if (geminiApiKey) setShowApiKeyModal(true);
       }
 
       showToast(
@@ -493,7 +510,7 @@ export default function App({ initialDesign, onPersist, headerSlot }: AppProps =
   };
 
   const handleRebuildFromPrompt = async (prompt: string) => {
-    if (!geminiApiKey) {
+    if (!geminiApiKey && !hostedAiWorkspaceId) {
       setPendingAiAction(() => () => handleRebuildFromPrompt(prompt));
       setShowApiKeyModal(true);
       return;
@@ -501,8 +518,9 @@ export default function App({ initialDesign, onPersist, headerSlot }: AppProps =
 
     setIsDigitizing(true);
     try {
-      // BYOK: call Gemini directly from the browser (no backend required).
-      const data = await rebuildFromPromptClient(geminiApiKey, prompt);
+      const data = geminiApiKey
+        ? await rebuildFromPromptClient(geminiApiKey, prompt)
+        : await rebuildFromPromptHosted(hostedAiWorkspaceId as string, prompt);
 
       // Use the same normalisation pipeline as the digitizer so assets are
       // correctly typed, positioned and auto-bound to their rooms.
@@ -516,8 +534,9 @@ export default function App({ initialDesign, onPersist, headerSlot }: AppProps =
       setAssets(mappedAssets);
       showToast(`Generated ${mappedRooms.length} rooms and ${mappedAssets.length} assets from your prompt.`);
     } catch (err: any) {
-      // If the key was rejected, reopen the key modal so the user can fix it.
-      if (err.status === 401 || err.status === 403) {
+      if (err.status === 402) {
+        onUpgradeNeeded?.();
+      } else if ((err.status === 401 || err.status === 403) && geminiApiKey) {
         setShowApiKeyModal(true);
       }
       showToast(err.message || 'Error processing prompt.', 'error');

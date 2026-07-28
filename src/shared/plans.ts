@@ -13,6 +13,8 @@ export interface Plan {
   features: string[];
   /** Max projects allowed; null = unlimited. */
   maxProjects: number | null;
+  /** Hosted AI generations allowed per calendar month; null = unlimited. */
+  aiCreditsPerMonth: number | null;
   /** Server env var holding this plan's Stripe price ID (paid plans only). */
   priceEnv?: string;
 }
@@ -23,8 +25,9 @@ export const PLANS: Record<PlanId, Plan> = {
     name: 'Free',
     priceLabel: '$0',
     blurb: 'For trying it out and solo one-offs.',
-    features: ['1 project', 'BYOK AI (your Gemini key)', '3D + 2D workspace', 'PNG / JSON export'],
+    features: ['1 project', '5 AI generations / mo', 'BYOK AI (unlimited)', 'PNG / JSON export'],
     maxProjects: 1,
+    aiCreditsPerMonth: 5,
   },
   pro: {
     id: 'pro',
@@ -33,11 +36,12 @@ export const PLANS: Record<PlanId, Plan> = {
     blurb: 'For professionals running real projects.',
     features: [
       'Unlimited projects',
-      'Everything in Free',
+      '200 AI generations / mo',
       'PDF reports + bill of materials',
       'Priority support',
     ],
     maxProjects: null,
+    aiCreditsPerMonth: 200,
     priceEnv: 'STRIPE_PRICE_PRO',
   },
   team: {
@@ -45,8 +49,9 @@ export const PLANS: Record<PlanId, Plan> = {
     name: 'Team',
     priceLabel: '$99',
     blurb: 'For integrators and facilities teams.',
-    features: ['Everything in Pro', 'Shared workspace', 'Team roles (coming soon)', 'SSO (coming soon)'],
+    features: ['Everything in Pro', 'Unlimited AI generations', 'Shared workspace', 'SSO (coming soon)'],
     maxProjects: null,
+    aiCreditsPerMonth: null,
     priceEnv: 'STRIPE_PRICE_TEAM',
   },
 };
@@ -56,4 +61,10 @@ export const PLAN_ORDER: PlanId[] = ['free', 'pro', 'team'];
 /** How many projects a plan permits (null = unlimited). */
 export function maxProjectsForPlan(plan: PlanId): number | null {
   return PLANS[plan]?.maxProjects ?? PLANS.free.maxProjects;
+}
+
+/** Monthly hosted-AI generation allowance for a plan (null = unlimited). */
+export function aiCreditsForPlan(plan: PlanId): number | null {
+  const p = PLANS[plan] ?? PLANS.free;
+  return p.aiCreditsPerMonth;
 }
