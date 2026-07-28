@@ -7,10 +7,11 @@
  *     <App /> wired to cloud persistence with a project switcher / user menu.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2, Plus, LogOut, ChevronDown, Sparkles } from 'lucide-react';
+import { Loader2, Plus, LogOut, ChevronDown, Sparkles, Users } from 'lucide-react';
 import App, { AppDesign } from '../App';
 import AuthScreen from './AuthScreen';
 import BillingModal from './BillingModal';
+import TeamModal from './TeamModal';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import { DEFAULT_ROOMS, DEFAULT_ASSETS } from '../data/defaultFloorPlan';
@@ -18,11 +19,14 @@ import { showToast } from '../utils/toast';
 import { PlanId, maxProjectsForPlan } from '../shared/plans';
 import { getWorkspacePlan } from '../lib/billing';
 import { uploadBlueprint, getBlueprintUrl, deleteBlueprint } from '../lib/blueprints';
+import { Role, listMyInvitations } from '../lib/team';
 import {
   Workspace,
   ProjectSummary,
   Project,
   ensureWorkspace,
+  listWorkspaces,
+  getMyRole,
   listProjects,
   getProject,
   createProject,
@@ -56,17 +60,20 @@ export default function SaaSGate() {
 
   // WorkspaceView remounts naturally on sign-out/in (this branch unmounts when
   // the session clears), so it needs no explicit key.
-  return <WorkspaceView email={session.user.email || 'Account'} />;
+  return <WorkspaceView userId={session.user.id} email={session.user.email || 'Account'} />;
 }
 
-function WorkspaceView({ email }: { email: string }) {
+function WorkspaceView({ userId, email }: { userId: string; email: string }) {
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [design, setDesign] = useState<AppDesign | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<PlanId>('free');
+  const [myRole, setMyRole] = useState<Role>('member');
   const [showBilling, setShowBilling] = useState(false);
+  const [showTeam, setShowTeam] = useState(false);
 
   // Blueprint object-storage bookkeeping (kept in refs so autosave doesn't
   // re-upload the same image or store a giant base64 blob in the DB row).
@@ -86,32 +93,35 @@ function WorkspaceView({ email }: { email: string }) {
     return { rooms: d.rooms ?? [], assets: d.assets ?? [], blueprintImage };
   }, []);
 
-  // Bootstrap: workspace -> projects -> load (or seed) the first project.
+  // Load a workspace's projects, plan, role and its first project.
+  const loadWorkspace = useCallback(async (ws: Workspace) => {
+    setWorkspace(ws);
+    setDesign(null); // show the loading state while switching
+    let list = await listProjects(ws.id);
+    if (list.length === 0) {
+      const created = await createProject(ws.id, 'My First Project', SEED_DESIGN);
+      list = [{ id: created.id, name: created.name, updated_at: created.updated_at }];
+    }
+    setProjects(list);
+    const full = await getProject(list[0].id);
+    const hydrated = await hydrate(full);
+    setCurrentId(full.id);
+    setDesign(hydrated);
+    const [wp, role] = await Promise.all([getWorkspacePlan(ws.id), getMyRole(ws.id)]);
+    setPlan(wp.plan);
+    setMyRole(role ?? 'member');
+  }, [hydrate]);
+
+  // Bootstrap: ensure a workspace exists, list them, load the first.
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        const ws = await ensureWorkspace();
+        await ensureWorkspace();
+        const list = await listWorkspaces();
         if (!active) return;
-        setWorkspace(ws);
-
-        let list = await listProjects(ws.id);
-        if (list.length === 0) {
-          const created = await createProject(ws.id, 'My First Project', SEED_DESIGN);
-          list = [{ id: created.id, name: created.name, updated_at: created.updated_at }];
-        }
-        if (!active) return;
-        setProjects(list);
-
-        const full = await getProject(list[0].id);
-        const hydrated = await hydrate(full);
-        if (!active) return;
-        setCurrentId(full.id);
-        setDesign(hydrated);
-
-        // Load the workspace's current plan for gating + the header badge.
-        const wp = await getWorkspacePlan(ws.id);
-        if (active) setPlan(wp.plan);
+        setWorkspaces(list);
+        if (list[0]) await loadWorkspace(list[0]);
       } catch (err: any) {
         if (active) setError(err?.message || 'Failed to load your workspace.');
       }
@@ -119,7 +129,56 @@ function WorkspaceView({ email }: { email: string }) {
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // One-time nudge if the user has pending invitations to workspaces they
+  // haven't joined yet.
+  const invitesChecked = useRef(false);
+  useEffect(() => {
+    if (invitesChecked.current || workspaces.length === 0) return;
+    invitesChecked.current = true;
+    (async () => {
+      try {
+        const mine = (await listMyInvitations(email)).filter(
+          (i) => !workspaces.some((w) => w.id === i.workspaceId)
+        );
+        if (mine.length) {
+          showToast(
+            `You have ${mine.length} workspace invitation${mine.length > 1 ? 's' : ''}. Open Team (👥) to accept.`,
+            'info',
+            { durationMs: 7000 }
+          );
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [workspaces, email]);
+
+  const switchWorkspace = async (id: string) => {
+    if (id === workspace?.id) return;
+    const ws = workspaces.find((w) => w.id === id);
+    if (ws) {
+      try {
+        await loadWorkspace(ws);
+      } catch (e: any) {
+        showToast(e?.message || 'Could not open that workspace.', 'error');
+      }
+    }
+  };
+
+  // After accepting an invite, refresh the workspace list and switch to the newest.
+  const reloadWorkspaces = async () => {
+    try {
+      const list = await listWorkspaces();
+      setWorkspaces(list);
+      const joined = list[list.length - 1];
+      if (joined) await loadWorkspace(joined);
+    } catch (e: any) {
+      showToast(e?.message || 'Could not refresh workspaces.', 'error');
+    }
+  };
 
   // After returning from Stripe Checkout, the webhook may lag a beat — re-check
   // the plan a few times, then clean the ?billing= param from the URL.
@@ -269,6 +328,25 @@ function WorkspaceView({ email }: { email: string }) {
 
   const header = (
     <div className="flex items-center gap-2">
+      {/* Workspace switcher (only when the user belongs to more than one) */}
+      {workspaces.length > 1 && (
+        <div className="relative hidden md:flex items-center">
+          <select
+            value={workspace?.id || ''}
+            onChange={(e) => switchWorkspace(e.target.value)}
+            className="appearance-none text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-lg pl-3 pr-7 py-1.5 cursor-pointer hover:bg-violet-100 focus:outline-none focus:ring-2 focus:ring-violet-200 max-w-[170px] truncate"
+            title="Switch workspace"
+          >
+            {workspaces.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="w-3.5 h-3.5 text-violet-400 absolute right-2 pointer-events-none" />
+        </div>
+      )}
+
       <div className="relative hidden sm:flex items-center">
         <select
           value={currentId}
@@ -291,6 +369,15 @@ function WorkspaceView({ email }: { email: string }) {
         title="New project"
       >
         <Plus className="w-4 h-4" />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setShowTeam(true)}
+        className="p-1.5 rounded-lg text-slate-500 hover:text-violet-600 hover:bg-violet-50 transition-all"
+        title="Team & invitations"
+      >
+        <Users className="w-4 h-4" />
       </button>
 
       <div className="h-6 w-px bg-slate-200 mx-1 hidden md:block" />
@@ -339,6 +426,16 @@ function WorkspaceView({ email }: { email: string }) {
       </div>
       {showBilling && workspace && (
         <BillingModal workspaceId={workspace.id} currentPlan={plan} onClose={() => setShowBilling(false)} />
+      )}
+      {showTeam && workspace && (
+        <TeamModal
+          workspaceId={workspace.id}
+          myUserId={userId}
+          myRole={myRole}
+          myEmail={email}
+          onClose={() => setShowTeam(false)}
+          onJoined={reloadWorkspaces}
+        />
       )}
     </>
   );

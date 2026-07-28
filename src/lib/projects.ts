@@ -51,17 +51,27 @@ export async function ensureWorkspace(): Promise<Workspace> {
   const existing = await listWorkspaces();
   if (existing.length > 0) return existing[0];
 
-  // The signup trigger normally creates one; create a fallback if missing.
+  // The signup trigger normally creates one; create a fallback via the
+  // SECURITY DEFINER RPC (direct member inserts are no longer allowed by RLS).
+  const { error } = await client().rpc('create_personal_workspace', { ws_name: 'My Workspace' });
+  if (error) throw error;
+  const refreshed = await listWorkspaces();
+  if (refreshed.length === 0) throw new Error('Could not create a workspace.');
+  return refreshed[0];
+}
+
+/** The current user's role in a workspace (owner / admin / member), or null. */
+export async function getMyRole(workspaceId: string): Promise<'owner' | 'admin' | 'member' | null> {
   const { data: auth } = await client().auth.getUser();
   const uid = auth.user?.id;
-  const { data, error } = await client()
-    .from('workspaces')
-    .insert({ name: 'My Workspace', owner_id: uid })
-    .select('id, name, owner_id')
-    .single();
-  if (error) throw error;
-  await client().from('workspace_members').insert({ workspace_id: data.id, user_id: uid, role: 'owner' });
-  return data;
+  if (!uid) return null;
+  const { data } = await client()
+    .from('workspace_members')
+    .select('role')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', uid)
+    .maybeSingle();
+  return (data?.role as any) ?? null;
 }
 
 /** Projects in a workspace, newest first. */

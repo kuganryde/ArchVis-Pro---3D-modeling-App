@@ -200,6 +200,8 @@ configured:
    - `0003_ai_usage.sql` — hosted-AI usage metering (only needed for hosted AI).
    - `0004_blueprint_storage.sql` — a private `blueprints` Storage bucket + RLS
      so uploaded floor plans are stored as objects, not base64 in the DB row.
+   - `0005_ai_cache.sql` — caches hosted-AI results to cut Gemini cost.
+   - `0006_team.sql` — team invitations, roles, and tightened membership RLS.
 3. Copy the **Project URL** and **anon key** into `VITE_SUPABASE_URL` and
    `VITE_SUPABASE_ANON_KEY`.
 4. Restart the dev server / rebuild. Users now sign up, and each design is saved

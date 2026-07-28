@@ -84,9 +84,25 @@ repeat digitize/rebuild with identical input returns the stored layout instantly
 **free — no Gemini call and no credit consumed**. The cache degrades to a miss if
 the table is absent, so it's safe to deploy before applying the migration.
 
-**Still to do in this milestone:**
+**Team collaboration (implemented).** Workspaces are now multi-user.
 
-- **Team roles & collaboration** — invite members with roles; enforce permissions.
+- DB (`supabase/migrations/0006_team.sql`): an `invitations` table; roles
+  (owner/admin/member); tightened membership RLS (removes the permissive
+  self-insert; admins manage members/roles, members can leave, owner is
+  protected); a co-member `profiles` read policy; and SECURITY DEFINER RPCs
+  `create_personal_workspace` and `accept_invitation`.
+- Client: `src/lib/team.ts` (members, roles, invites, accept) + `TeamModal`
+  (member list with role controls, invite-by-email, pending invites, and
+  accepting invitations addressed to you). `SaaSGate` gained a workspace
+  switcher, a Team button, current-role loading, and a pending-invite nudge.
+- Flow: an admin invites an email → the invitee signs up/in with that email →
+  they see the invite in Team and accept → they join and can switch to the
+  shared workspace. No email delivery required.
+
+## Later
+
+- Email delivery for invitations (currently in-app acceptance only).
+- Realtime co-editing; audit log; SSO.
 
 ## Milestone 3 — moat & expansion
 
