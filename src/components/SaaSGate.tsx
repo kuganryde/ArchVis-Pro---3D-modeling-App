@@ -334,6 +334,7 @@ function WorkspaceView({ email }: { email: string }) {
           headerSlot={header}
           hostedAiWorkspaceId={workspace?.id}
           onUpgradeNeeded={() => setShowBilling(true)}
+          plan={plan}
         />
       </div>
       {showBilling && workspace && (

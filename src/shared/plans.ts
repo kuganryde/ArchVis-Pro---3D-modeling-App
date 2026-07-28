@@ -25,7 +25,7 @@ export const PLANS: Record<PlanId, Plan> = {
     name: 'Free',
     priceLabel: '$0',
     blurb: 'For trying it out and solo one-offs.',
-    features: ['1 project', '5 AI generations / mo', 'BYOK AI (unlimited)', 'PNG / JSON export'],
+    features: ['1 project', '5 AI generations / mo', 'BYOK AI (unlimited)', 'Watermarked exports'],
     maxProjects: 1,
     aiCreditsPerMonth: 5,
   },
@@ -37,8 +37,8 @@ export const PLANS: Record<PlanId, Plan> = {
     features: [
       'Unlimited projects',
       '200 AI generations / mo',
+      'Clean, unwatermarked exports',
       'PDF reports + bill of materials',
-      'Priority support',
     ],
     maxProjects: null,
     aiCreditsPerMonth: 200,
@@ -67,4 +67,9 @@ export function maxProjectsForPlan(plan: PlanId): number | null {
 export function aiCreditsForPlan(plan: PlanId): number | null {
   const p = PLANS[plan] ?? PLANS.free;
   return p.aiCreditsPerMonth;
+}
+
+/** Paid plans get clean (unwatermarked) exports; Free is watermarked. */
+export function allowsCleanExports(plan: PlanId): boolean {
+  return plan !== 'free';
 }

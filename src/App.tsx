@@ -13,6 +13,8 @@ import { mapApiLayout } from './utils/layout';
 import { saveDesign, loadDesign, clearDesign } from './utils/persistence';
 import { showToast } from './utils/toast';
 import { computeBom, formatMoney } from './utils/bom';
+import { watermarkPng } from './utils/watermark';
+import { PlanId, allowsCleanExports } from './shared/plans';
 import { digitizeBlueprintClient, rebuildFromPromptClient } from './utils/gemini';
 import { digitizeBlueprintHosted, rebuildFromPromptHosted } from './lib/aiHosted';
 import {
@@ -55,6 +57,8 @@ export interface AppProps {
   hostedAiWorkspaceId?: string;
   /** Called when hosted AI hits the plan's monthly limit (402), to prompt an upgrade. */
   onUpgradeNeeded?: () => void;
+  /** Current plan (SaaS mode). Free-plan exports are watermarked; undefined (local mode) = clean. */
+  plan?: PlanId;
 }
 
 export default function App({
@@ -63,6 +67,7 @@ export default function App({
   headerSlot,
   hostedAiWorkspaceId,
   onUpgradeNeeded,
+  plan,
 }: AppProps = {}) {
   // Local-mode fallback: restore the browser autosave or the seed layout.
   const localPersisted = typeof window !== 'undefined' && !initialDesign ? loadDesign() : null;
@@ -551,18 +556,22 @@ export default function App({
 
   // ---- Real export actions used by the Share & Export modal ----
 
+  // Free-plan exports are watermarked; Pro/Team (and local mode) are clean.
+  const watermarkExports = plan ? !allowsCleanExports(plan) : false;
+
   // PNG snapshot of the live 3D canvas.
-  const handleExportImage = () => {
-    const dataUrl = captureRef.current?.();
+  const handleExportImage = async () => {
+    let dataUrl = captureRef.current?.();
     if (!dataUrl) {
       showToast('Canvas is not ready for capture yet. Try again in a moment.', 'error');
       return;
     }
+    if (watermarkExports) dataUrl = await watermarkPng(dataUrl, 'ArchViz Pro · Free');
     const link = document.createElement('a');
     link.href = dataUrl;
     link.download = `archviz_snapshot_${new Date().toISOString().split('T')[0]}.png`;
     link.click();
-    showToast('Snapshot PNG downloaded.');
+    showToast(watermarkExports ? 'Snapshot downloaded (watermarked — upgrade for clean exports).' : 'Snapshot PNG downloaded.');
   };
 
   // Full JSON schematic backup.
@@ -590,8 +599,9 @@ export default function App({
 
   // Printable PDF report (via the browser print dialog) including a snapshot,
   // room summary and full asset inventory.
-  const handleExportPDF = () => {
-    const snapshot = captureRef.current?.();
+  const handleExportPDF = async () => {
+    let snapshot = captureRef.current?.();
+    if (snapshot && watermarkExports) snapshot = await watermarkPng(snapshot, 'ArchViz Pro · Free');
     const totalArea = rooms.reduce((sum, r) => sum + r.width * r.depth * 10.7639, 0);
     const roomRows = rooms
       .map((r) => {
@@ -637,9 +647,13 @@ export default function App({
         th{background:#f8fafc;} h2{font-size:14px;margin:16px 0 8px;}
         .stats{display:flex;gap:24px;margin-bottom:20px;font-size:13px;}
         .stats b{display:block;font-size:20px;}
+        .wm{position:fixed;top:42%;left:0;right:0;text-align:center;font-size:72px;font-weight:800;
+            color:rgba(124,58,237,.10);transform:rotate(-22deg);pointer-events:none;z-index:0;}
+        .wm-foot{margin-top:8px;font-size:11px;color:#7c3aed;}
       </style></head><body>
+      ${watermarkExports ? '<div class="wm">ArchViz Pro · Free</div>' : ''}
       <h1>Office Digital Twin — Audit Report</h1>
-      <div class="sub">Generated ${new Date().toLocaleString()}</div>
+      <div class="sub">Generated ${new Date().toLocaleString()}${watermarkExports ? ' · <span class="wm-foot">Free plan — upgrade to remove the watermark</span>' : ''}</div>
       <div class="stats">
         <div><b>${rooms.length}</b>Rooms</div>
         <div><b>${assets.length}</b>Assets</div>
