@@ -60,10 +60,22 @@ browser).
 - Client routes AI to hosted vs BYOK automatically; `BillingModal` shows a
   monthly credits meter.
 
+**Blueprint object storage (implemented).** In SaaS mode, uploaded blueprint
+images go to a private Supabase Storage bucket (`blueprints`) under
+`<workspaceId>/<projectId>/…`; the project row stores only the object PATH, and
+the app renders via short-lived signed URLs. This keeps the `projects.data`
+JSONB row tiny (previously a multi-MB base64 blob was rewritten on every
+autosave). Local mode still inlines a data URL in localStorage.
+
+- DB/storage: `supabase/migrations/0004_blueprint_storage.sql` (private bucket +
+  member-scoped RLS on `storage.objects`).
+- Client: `src/lib/blueprints.ts` (upload / signed URL / delete); `SaaSGate`
+  uploads on autosave (de-duped), hydrates a signed URL on load, and cleans up
+  replaced/removed objects. Legacy projects with an inline `blueprintImage` still
+  load.
+
 **Still to do in this milestone:**
 
-- **Blueprint storage.** Move base64 blueprints out of the JSONB row into
-  Supabase Storage (object storage) and reference by URL.
 - **Entitlements by plan** beyond project/AI limits (e.g. watermarked exports on Free).
 - **Caching** of AI digitization results (large images are the main COGS).
 

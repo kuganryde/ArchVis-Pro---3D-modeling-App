@@ -192,11 +192,14 @@ configured:
 ### Enable SaaS mode
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Apply the schema: open the SQL editor and run
-   [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql)
-   (or `supabase db push` with the CLI). This creates `profiles`, `workspaces`,
-   `workspace_members` and `projects`, the RLS policies, and a signup trigger
-   that gives each new user a personal workspace.
+2. Apply the migrations in [`supabase/migrations`](supabase/migrations) in order
+   (SQL editor or `supabase db push`):
+   - `0001_init.sql` — `profiles`, `workspaces`, `workspace_members`, `projects`,
+     RLS, and a signup trigger that gives each new user a personal workspace.
+   - `0002_billing.sql` — subscriptions (only needed for Stripe billing).
+   - `0003_ai_usage.sql` — hosted-AI usage metering (only needed for hosted AI).
+   - `0004_blueprint_storage.sql` — a private `blueprints` Storage bucket + RLS
+     so uploaded floor plans are stored as objects, not base64 in the DB row.
 3. Copy the **Project URL** and **anon key** into `VITE_SUPABASE_URL` and
    `VITE_SUPABASE_ANON_KEY`.
 4. Restart the dev server / rebuild. Users now sign up, and each design is saved

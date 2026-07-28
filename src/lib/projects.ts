@@ -20,7 +20,10 @@ export interface ProjectSummary {
 export interface ProjectDesign {
   rooms: RoomDefinition[];
   assets: PlacedAsset[];
-  blueprintImage: string | null;
+  /** Legacy inline data URL (older projects / before object storage). */
+  blueprintImage?: string | null;
+  /** Preferred: Storage object path for the blueprint image. */
+  blueprintPath?: string | null;
 }
 
 export interface Project extends ProjectSummary {

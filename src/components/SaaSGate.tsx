@@ -6,7 +6,7 @@
  *   - configured + session -> load the user's workspace + a project, then render
  *     <App /> wired to cloud persistence with a project switcher / user menu.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Plus, LogOut, ChevronDown, Sparkles } from 'lucide-react';
 import App, { AppDesign } from '../App';
 import AuthScreen from './AuthScreen';
@@ -17,9 +17,11 @@ import { DEFAULT_ROOMS, DEFAULT_ASSETS } from '../data/defaultFloorPlan';
 import { showToast } from '../utils/toast';
 import { PlanId, maxProjectsForPlan } from '../shared/plans';
 import { getWorkspacePlan } from '../lib/billing';
+import { uploadBlueprint, getBlueprintUrl, deleteBlueprint } from '../lib/blueprints';
 import {
   Workspace,
   ProjectSummary,
+  Project,
   ensureWorkspace,
   listProjects,
   getProject,
@@ -66,6 +68,24 @@ function WorkspaceView({ email }: { email: string }) {
   const [plan, setPlan] = useState<PlanId>('free');
   const [showBilling, setShowBilling] = useState(false);
 
+  // Blueprint object-storage bookkeeping (kept in refs so autosave doesn't
+  // re-upload the same image or store a giant base64 blob in the DB row).
+  const blueprintPathRef = useRef<string | null>(null); // current object path
+  const uploadedDataUrlRef = useRef<string | null>(null); // data URL already uploaded
+  const uploadingRef = useRef<{ img: string; promise: Promise<string> } | null>(null);
+
+  // Turn a stored project into an AppDesign, resolving the blueprint path into a
+  // signed URL for rendering and resetting the storage refs for this project.
+  const hydrate = useCallback(async (full: Project): Promise<AppDesign> => {
+    const d = full.data || ({} as any);
+    blueprintPathRef.current = d.blueprintPath ?? null;
+    uploadedDataUrlRef.current = null;
+    uploadingRef.current = null;
+    let blueprintImage: string | null = d.blueprintImage ?? null; // legacy inline
+    if (d.blueprintPath) blueprintImage = await getBlueprintUrl(d.blueprintPath);
+    return { rooms: d.rooms ?? [], assets: d.assets ?? [], blueprintImage };
+  }, []);
+
   // Bootstrap: workspace -> projects -> load (or seed) the first project.
   useEffect(() => {
     let active = true;
@@ -84,13 +104,10 @@ function WorkspaceView({ email }: { email: string }) {
         setProjects(list);
 
         const full = await getProject(list[0].id);
+        const hydrated = await hydrate(full);
         if (!active) return;
         setCurrentId(full.id);
-        setDesign({
-          rooms: full.data?.rooms ?? [],
-          assets: full.data?.assets ?? [],
-          blueprintImage: full.data?.blueprintImage ?? null,
-        });
+        setDesign(hydrated);
 
         // Load the workspace's current plan for gating + the header badge.
         const wp = await getWorkspacePlan(ws.id);
@@ -133,24 +150,63 @@ function WorkspaceView({ email }: { email: string }) {
 
   const persist = useCallback(
     (d: AppDesign) => {
-      if (!currentId) return;
-      saveProjectDesign(currentId, d).catch((e) =>
-        showToast(e?.message || 'Cloud save failed.', 'error')
-      );
+      if (!currentId || !workspace) return;
+      const wsId = workspace.id;
+      const projId = currentId;
+      (async () => {
+        try {
+          let path = blueprintPathRef.current;
+          const img = d.blueprintImage;
+
+          if (!img) {
+            // Blueprint removed — drop the stored object.
+            if (path) deleteBlueprint(path).catch(() => {});
+            path = null;
+            blueprintPathRef.current = null;
+            uploadedDataUrlRef.current = null;
+          } else if (img.startsWith('data:')) {
+            // A freshly uploaded blueprint — upload once, de-duping concurrent saves.
+            if (uploadedDataUrlRef.current === img) {
+              path = blueprintPathRef.current;
+            } else if (uploadingRef.current && uploadingRef.current.img === img) {
+              path = await uploadingRef.current.promise;
+            } else {
+              const oldPath = blueprintPathRef.current;
+              const promise = uploadBlueprint(wsId, projId, img).then((p) => {
+                blueprintPathRef.current = p;
+                uploadedDataUrlRef.current = img;
+                if (oldPath && oldPath !== p) deleteBlueprint(oldPath).catch(() => {});
+                return p;
+              });
+              uploadingRef.current = { img, promise };
+              try {
+                path = await promise;
+              } finally {
+                if (uploadingRef.current && uploadingRef.current.img === img) uploadingRef.current = null;
+              }
+            }
+          } else {
+            // Already a URL (the signed URL we handed to App) — keep the path.
+            path = blueprintPathRef.current;
+          }
+
+          // Save only the compact path — never the multi-MB base64 blob.
+          await saveProjectDesign(projId, { rooms: d.rooms, assets: d.assets, blueprintPath: path });
+        } catch (e: any) {
+          showToast(e?.message || 'Cloud save failed.', 'error');
+        }
+      })();
     },
-    [currentId]
+    [currentId, workspace]
   );
 
   const switchProject = async (id: string) => {
     if (id === currentId) return;
     try {
       const full = await getProject(id);
+      const hydrated = await hydrate(full);
       setCurrentId(full.id);
-      setDesign({
-        rooms: full.data?.rooms ?? [],
-        assets: full.data?.assets ?? [],
-        blueprintImage: full.data?.blueprintImage ?? null,
-      });
+      setDesign(hydrated);
     } catch (e: any) {
       showToast(e?.message || 'Could not open that project.', 'error');
     }
@@ -171,6 +227,10 @@ function WorkspaceView({ email }: { email: string }) {
     if (!name) return;
     try {
       const created = await createProject(workspace.id, name, EMPTY_DESIGN);
+      // Fresh project — clear blueprint storage bookkeeping.
+      blueprintPathRef.current = null;
+      uploadedDataUrlRef.current = null;
+      uploadingRef.current = null;
       setProjects((p) => [{ id: created.id, name: created.name, updated_at: created.updated_at }, ...p]);
       setCurrentId(created.id);
       setDesign(EMPTY_DESIGN);
