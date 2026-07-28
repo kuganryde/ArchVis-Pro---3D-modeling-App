@@ -326,6 +326,9 @@ list for spreadsheets or reporting databases.
 
 ## 🌐 Deployment
 
+> 📋 Full go-live guide — every env var, migration, and the Stripe/webhook
+> steps in one checklist: **[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)**.
+
 Build and run the production bundle:
 
 ```bash
