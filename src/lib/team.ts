@@ -27,6 +27,21 @@ function client() {
   return supabase;
 }
 
+/** True when an error means the invitations table/RPC isn't in the DB yet. */
+function isMissingTeamSchema(error: any): boolean {
+  const msg = `${error?.message || ''} ${error?.details || ''}`.toLowerCase();
+  return (
+    error?.code === 'PGRST205' || // PostgREST: table not found in schema cache
+    error?.code === 'PGRST202' || // PostgREST: function (RPC) not found
+    error?.code === '42P01' || // Postgres: undefined_table
+    msg.includes('schema cache') ||
+    (msg.includes('invitations') && msg.includes('does not exist'))
+  );
+}
+
+const MIGRATION_HINT =
+  'Team features need the database migration supabase/migrations/0006_team.sql. Ask an admin to apply it in the Supabase SQL editor.';
+
 /** Members of a workspace, with display names resolved from profiles. */
 export async function listMembers(workspaceId: string): Promise<Member[]> {
   const { data, error } = await client()
@@ -49,7 +64,7 @@ export async function listMembers(workspaceId: string): Promise<Member[]> {
     .sort((a, b) => rank[a.role] - rank[b.role] || a.name.localeCompare(b.name));
 }
 
-/** Pending invitations for a workspace (admin view). */
+/** Pending invitations for a workspace (admin view). Empty if schema not applied. */
 export async function listInvitations(workspaceId: string): Promise<Invitation[]> {
   const { data, error } = await client()
     .from('invitations')
@@ -57,7 +72,10 @@ export async function listInvitations(workspaceId: string): Promise<Invitation[]
     .eq('workspace_id', workspaceId)
     .eq('status', 'pending')
     .order('created_at', { ascending: false });
-  if (error) throw error;
+  if (error) {
+    if (isMissingTeamSchema(error)) return []; // migration 0006 not applied yet
+    throw error;
+  }
   return (data ?? []).map((i) => ({
     id: i.id,
     workspaceId: i.workspace_id,
@@ -78,7 +96,7 @@ export async function inviteMember(
   const { error } = await client()
     .from('invitations')
     .insert({ workspace_id: workspaceId, email: email.trim().toLowerCase(), role, invited_by: auth.user?.id });
-  if (error) throw error;
+  if (error) throw new Error(isMissingTeamSchema(error) ? MIGRATION_HINT : error.message);
 }
 
 export async function revokeInvitation(id: string): Promise<void> {
@@ -126,6 +144,6 @@ export async function listMyInvitations(myEmail: string): Promise<Invitation[]> 
 /** Accept an invitation; returns the joined workspace id. */
 export async function acceptInvitation(id: string): Promise<string> {
   const { data, error } = await client().rpc('accept_invitation', { invite: id });
-  if (error) throw error;
+  if (error) throw new Error(isMissingTeamSchema(error) ? MIGRATION_HINT : error.message);
   return data as string;
 }
