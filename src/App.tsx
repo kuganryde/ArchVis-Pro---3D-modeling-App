@@ -665,11 +665,11 @@ export default function App({
       {/* 1. Bento Header Navigation */}
       <nav className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-md">
+          <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center shadow-md">
             <div className="w-4 h-4 border-2 border-white transform rotate-45"></div>
           </div>
           <span className="font-bold text-xl tracking-tight text-slate-900">
-            ArchViz <span className="text-blue-600 underline decoration-2 underline-offset-4">Pro</span>
+            ArchViz <span className="text-violet-600 underline decoration-2 underline-offset-4">Pro</span>
           </span>
           <div className="h-6 w-px bg-slate-200 mx-4"></div>
           {headerSlot ? (
@@ -738,7 +738,7 @@ export default function App({
             className={`av-btn av-btn-secondary av-btn-sm ${geminiApiKey ? '' : 'animate-pulse'}`}
             title="Configure Gemini API Key"
           >
-            <Key className={`w-3.5 h-3.5 ${geminiApiKey ? 'text-blue-600' : 'text-amber-600'}`} />
+            <Key className={`w-3.5 h-3.5 ${geminiApiKey ? 'text-violet-600' : 'text-amber-600'}`} />
             <span className="hidden xl:inline">{geminiApiKey ? 'API Key Active' : 'Set API Key'}</span>
           </button>
 
@@ -763,7 +763,7 @@ export default function App({
             onClick={() => setActiveTab('library')}
             className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${
               activeTab === 'library' 
-                ? 'bg-blue-50 text-blue-600 border border-blue-100 font-bold' 
+                ? 'bg-violet-50 text-violet-600 border border-violet-100 font-bold' 
                 : 'hover:bg-slate-100 text-slate-400 hover:text-slate-600'
             }`}
             title="Procurement Library"
@@ -776,7 +776,7 @@ export default function App({
             onClick={() => setActiveTab('rooms')}
             className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${
               activeTab === 'rooms' 
-                ? 'bg-blue-50 text-blue-600 border border-blue-100 font-bold' 
+                ? 'bg-violet-50 text-violet-600 border border-violet-100 font-bold' 
                 : 'hover:bg-slate-100 text-slate-400 hover:text-slate-600'
             }`}
             title="Modular Rooms"
@@ -789,7 +789,7 @@ export default function App({
             onClick={() => setActiveTab('reports')}
             className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${
               activeTab === 'reports' 
-                ? 'bg-blue-50 text-blue-600 border border-blue-100 font-bold' 
+                ? 'bg-violet-50 text-violet-600 border border-violet-100 font-bold' 
                 : 'hover:bg-slate-100 text-slate-400 hover:text-slate-600'
             }`}
             title="Dynamic Inventory"
@@ -884,7 +884,7 @@ export default function App({
           <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in" id="tutorial-overlay-backplane">
             <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden p-6 flex flex-col gap-4">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                <div className="p-2 rounded-xl bg-violet-50 text-violet-600">
                   <Sparkles className="w-5 h-5 animate-pulse" />
                 </div>
                 <div>
@@ -895,15 +895,15 @@ export default function App({
 
               <div className="space-y-3 text-xs text-slate-600 leading-normal border-y border-slate-100 py-4">
                 <div className="flex gap-2">
-                  <span className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+                  <span className="w-5 h-5 rounded-full bg-violet-50 text-violet-600 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
                   <p><b>Bright, Immersive Navigation:</b> Zoom, pan, and rotate using the mouse. Toggle <b>2D</b> blueprint view or <b>3D</b> extruded architectural layers using the navigation controls.</p>
                 </div>
                 <div className="flex gap-2">
-                  <span className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+                  <span className="w-5 h-5 rounded-full bg-violet-50 text-violet-600 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
                   <p><b>Mouse Drag Operations:</b> Select any equipment node (APs, CCTV cones, network outlets) by clicking directly. Left-click & drag any item to shift coordinates in space.</p>
                 </div>
                 <div className="flex gap-2">
-                  <span className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
+                  <span className="w-5 h-5 rounded-full bg-violet-50 text-violet-600 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
                   <p><b>Share & Export integration:</b> Export your schematic to PDF/Image formats, save as local JSON, or copy the direct HTML embed snippets to plug into your own site securely.</p>
                 </div>
               </div>
@@ -929,7 +929,7 @@ export default function App({
         <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white max-w-lg w-full rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3 bg-slate-50">
-              <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-inner">
+              <div className="w-10 h-10 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center shadow-inner">
                 <Key className="w-5 h-5" />
               </div>
               <div>
@@ -959,7 +959,7 @@ export default function App({
                   <input
                     type="password"
                     id="gemini-key-input"
-                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-sm font-mono shadow-sm"
+                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 transition-all text-sm font-mono shadow-sm"
                     placeholder="AIzaSy..."
                     defaultValue={geminiApiKey}
                     onKeyDown={(e) => {
@@ -971,7 +971,7 @@ export default function App({
                   />
                   <Key className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
                 </div>
-                <p className="text-[11px] text-slate-500 ml-1">Get your free key from <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-500 hover:underline">Google AI Studio</a>.</p>
+                <p className="text-[11px] text-slate-500 ml-1">Get your free key from <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-violet-500 hover:underline">Google AI Studio</a>.</p>
               </div>
             </div>
 
@@ -1006,7 +1006,7 @@ export default function App({
           <div className="bg-white max-w-2xl w-full rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
             <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-inner">
+                <div className="w-10 h-10 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center shadow-inner">
                   <Share2 className="w-5 h-5" />
                 </div>
                 <div>
@@ -1029,34 +1029,34 @@ export default function App({
 
                 <button
                   onClick={handleCopyJSON}
-                  className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all group"
+                  className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-violet-400 hover:bg-violet-50 transition-all group"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-slate-100 text-slate-600 rounded-lg group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                    <div className="p-2 bg-slate-100 text-slate-600 rounded-lg group-hover:bg-violet-100 group-hover:text-violet-600 transition-colors">
                       <Code2 className="w-4 h-4" />
                     </div>
                     <div className="text-left">
-                      <div className="text-sm font-semibold text-slate-700 group-hover:text-blue-700">Copy Design JSON</div>
+                      <div className="text-sm font-semibold text-slate-700 group-hover:text-violet-700">Copy Design JSON</div>
                       <div className="text-[10px] text-slate-500">Copy full layout to clipboard</div>
                     </div>
                   </div>
-                  <Copy className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
+                  <Copy className="w-4 h-4 text-slate-400 group-hover:text-violet-500" />
                 </button>
 
                 <button
                   onClick={handleExportJSON}
-                  className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all group"
+                  className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-violet-400 hover:bg-violet-50 transition-all group"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-slate-100 text-slate-600 rounded-lg group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                    <div className="p-2 bg-slate-100 text-slate-600 rounded-lg group-hover:bg-violet-100 group-hover:text-violet-600 transition-colors">
                       <Download className="w-4 h-4" />
                     </div>
                     <div className="text-left">
-                      <div className="text-sm font-semibold text-slate-700 group-hover:text-blue-700">Download JSON</div>
+                      <div className="text-sm font-semibold text-slate-700 group-hover:text-violet-700">Download JSON</div>
                       <div className="text-[10px] text-slate-500">Reimportable schematic backup</div>
                     </div>
                   </div>
-                  <Download className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
+                  <Download className="w-4 h-4 text-slate-400 group-hover:text-violet-500" />
                 </button>
 
                 <div className="text-[10px] text-slate-400 leading-relaxed p-3 rounded-xl bg-slate-50 border border-slate-100">

@@ -251,7 +251,7 @@ function WorkspaceView({ email }: { email: string }) {
           <p className="text-[11px] text-slate-400">
             Make sure the database migration in <code>supabase/migrations</code> has been applied.
           </p>
-          <button onClick={signOut} className="mt-4 text-xs text-blue-600 font-semibold hover:underline">
+          <button onClick={signOut} className="mt-4 text-xs text-violet-600 font-semibold hover:underline">
             Sign out
           </button>
         </div>
@@ -273,7 +273,7 @@ function WorkspaceView({ email }: { email: string }) {
         <select
           value={currentId}
           onChange={(e) => switchProject(e.target.value)}
-          className="appearance-none text-sm font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg pl-3 pr-7 py-1.5 cursor-pointer hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200 max-w-[200px] truncate"
+          className="appearance-none text-sm font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg pl-3 pr-7 py-1.5 cursor-pointer hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-200 max-w-[200px] truncate"
           title="Switch project"
         >
           {projects.map((p) => (
@@ -287,7 +287,7 @@ function WorkspaceView({ email }: { email: string }) {
       <button
         type="button"
         onClick={newProject}
-        className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all"
+        className="p-1.5 rounded-lg text-slate-500 hover:text-violet-600 hover:bg-violet-50 transition-all"
         title="New project"
       >
         <Plus className="w-4 h-4" />

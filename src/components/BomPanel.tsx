@@ -26,13 +26,13 @@ export default function BomPanel({ assets }: { assets: PlacedAsset[] }) {
     <div className="rounded-xl border border-slate-200/70 bg-white shadow-3xs overflow-hidden">
       <div className="px-3.5 py-2.5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
         <div className="flex items-center gap-1.5">
-          <Receipt className="w-4 h-4 text-blue-600" />
+          <Receipt className="w-4 h-4 text-violet-600" />
           <span className="text-xs font-bold text-slate-800">Bill of Materials</span>
         </div>
         <button
           onClick={exportCsv}
           disabled={bom.lines.length === 0}
-          className="text-[10px] font-bold text-blue-600 hover:text-blue-700 disabled:text-slate-300 flex items-center gap-1"
+          className="text-[10px] font-bold text-violet-600 hover:text-violet-700 disabled:text-slate-300 flex items-center gap-1"
         >
           <Download className="w-3 h-3" /> CSV
         </button>

@@ -47,11 +47,11 @@ export default function AuthScreen() {
     <div className="min-h-screen w-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
         <div className="px-8 pt-8 pb-6 text-center border-b border-slate-100">
-          <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center shadow-md mx-auto mb-3">
+          <div className="w-12 h-12 bg-violet-600 rounded-xl flex items-center justify-center shadow-md mx-auto mb-3">
             <Building2 className="w-6 h-6 text-white" />
           </div>
           <h1 className="text-xl font-bold text-slate-900">
-            ArchViz <span className="text-blue-600">Pro</span>
+            ArchViz <span className="text-violet-600">Pro</span>
           </h1>
           <p className="text-xs text-slate-500 mt-1">
             {mode === 'signin' ? 'Sign in to your workspace' : 'Create your workspace account'}
@@ -66,7 +66,7 @@ export default function AuthScreen() {
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-sm"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 transition-all text-sm"
                 placeholder="Jane Engineer"
                 required
               />
@@ -81,7 +81,7 @@ export default function AuthScreen() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-sm"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 transition-all text-sm"
                 placeholder="you@company.com"
                 required
               />
@@ -96,7 +96,7 @@ export default function AuthScreen() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-sm"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 transition-all text-sm"
                 placeholder="••••••••"
                 minLength={6}
                 required
@@ -129,7 +129,7 @@ export default function AuthScreen() {
                 setError(null);
                 setNotice(null);
               }}
-              className="text-blue-600 font-semibold hover:underline"
+              className="text-violet-600 font-semibold hover:underline"
             >
               {mode === 'signin' ? 'Sign up' : 'Sign in'}
             </button>

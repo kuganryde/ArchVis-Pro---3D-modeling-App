@@ -351,7 +351,7 @@ export default function CADSidebar({
             type="button"
             onClick={() => onSetActiveTab('library')}
             className={`flex-1 py-2 text-center rounded-lg flex items-center justify-center gap-1.5 transition-all text-slate-505 hover:text-slate-900 cursor-pointer ${
-              activeTab === 'library' ? 'bg-white shadow-xs text-blue-600 font-bold border border-slate-200/40' : ''
+              activeTab === 'library' ? 'bg-white shadow-xs text-violet-600 font-bold border border-slate-200/40' : ''
             }`}
           >
             <Cpu className="w-3.5 h-3.5" />
@@ -361,7 +361,7 @@ export default function CADSidebar({
             type="button"
             onClick={() => onSetActiveTab('rooms')}
             className={`flex-1 py-2 text-center rounded-lg flex items-center justify-center gap-1.5 transition-all text-slate-505 hover:text-slate-900 cursor-pointer ${
-              activeTab === 'rooms' ? 'bg-white shadow-xs text-blue-600 font-bold border border-slate-200/40' : ''
+              activeTab === 'rooms' ? 'bg-white shadow-xs text-violet-600 font-bold border border-slate-200/40' : ''
             }`}
           >
             <Layout className="w-3.5 h-3.5" />
@@ -371,7 +371,7 @@ export default function CADSidebar({
             type="button"
             onClick={() => onSetActiveTab('reports')}
             className={`flex-1 py-2 text-center rounded-lg flex items-center justify-center gap-1.5 transition-all text-slate-505 hover:text-slate-900 cursor-pointer ${
-              activeTab === 'reports' ? 'bg-white shadow-xs text-blue-600 font-bold border border-slate-200/40' : ''
+              activeTab === 'reports' ? 'bg-white shadow-xs text-violet-600 font-bold border border-slate-200/40' : ''
             }`}
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
@@ -406,7 +406,7 @@ export default function CADSidebar({
                     onClick={() => onSetCategoryFilter('infrastructure')}
                     className={`py-1 text-[11px] text-center rounded-lg transition-all font-semibold flex items-center justify-center gap-1 cursor-pointer ${
                       activeCategoryFilter === 'infrastructure' 
-                        ? 'bg-blue-600 text-white shadow-sm' 
+                        ? 'bg-violet-600 text-white shadow-sm' 
                         : 'text-slate-505 hover:text-slate-900'
                     }`}
                   >
@@ -429,13 +429,13 @@ export default function CADSidebar({
               </div>
 
               {/* Intelligent Low-Current Network Optimization Panel */}
-              <div className="p-3.5 rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50/50 to-indigo-50/20 space-y-3 shadow-3xs" id="network-telemetry-panel">
+              <div className="p-3.5 rounded-xl border border-violet-100 bg-gradient-to-br from-violet-50/50 to-violet-50/20 space-y-3 shadow-3xs" id="network-telemetry-panel">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <Wifi className="w-4 h-4 text-blue-600 animate-pulse" />
+                    <Wifi className="w-4 h-4 text-violet-600 animate-pulse" />
                     <span className="text-xs font-bold text-slate-800 tracking-tight font-sans">Network Infrastructure Overlays</span>
                   </div>
-                  <span className="text-[9.5px] font-mono font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-md">MDU v1.5</span>
+                  <span className="text-[9.5px] font-mono font-bold bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-md">MDU v1.5</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -444,7 +444,7 @@ export default function CADSidebar({
                     onClick={() => onSetShowWifiHeatmap(!showWifiHeatmap)}
                     className={`py-1.5 px-2 text-[11px] rounded-lg border font-semibold flex items-center justify-center gap-1 cursor-pointer transition-all ${
                       showWifiHeatmap 
-                        ? 'bg-blue-600 border-blue-600 text-white font-bold shadow-xs' 
+                        ? 'bg-violet-600 border-violet-600 text-white font-bold shadow-xs' 
                         : 'bg-white border-slate-200 text-slate-650 hover:bg-slate-50'
                     }`}
                   >
@@ -456,7 +456,7 @@ export default function CADSidebar({
                     onClick={() => onSetShowCablingPaths(!showCablingPaths)}
                     className={`py-1.5 px-2 text-[11px] rounded-lg border font-semibold flex items-center justify-center gap-1 cursor-pointer transition-all ${
                       showCablingPaths 
-                        ? 'bg-indigo-600 border-indigo-600 text-white font-bold shadow-xs' 
+                        ? 'bg-violet-600 border-violet-600 text-white font-bold shadow-xs' 
                         : 'bg-white border-slate-200 text-slate-650 hover:bg-slate-50'
                     }`}
                   >
@@ -468,7 +468,7 @@ export default function CADSidebar({
                 {/* AI Optimal AP Placement Recommendation Engine */}
                 <div className="bg-white/80 border border-slate-200/60 rounded-lg p-2 flex flex-col gap-1.5">
                   <div className="flex justify-between items-center text-[10px] text-slate-500 font-medium">
-                    <span className="font-mono flex items-center gap-1"><Cpu className="w-3 h-3 text-indigo-500" /> Optimal AP Planner</span>
+                    <span className="font-mono flex items-center gap-1"><Cpu className="w-3 h-3 text-violet-500" /> Optimal AP Planner</span>
                     <span className="text-emerald-600 font-bold">Auto-Placement Ready</span>
                   </div>
                   <p className="text-[10px] text-slate-550 leading-tight">
@@ -491,7 +491,7 @@ export default function CADSidebar({
                       });
 
                       const toast = document.createElement('div');
-                      toast.className = "fixed bottom-14 right-5 bg-indigo-600 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-indigo-400 z-50 flex items-center gap-2 animate-in slide-in-from-bottom-4 duration-300";
+                      toast.className = "fixed bottom-14 right-5 bg-violet-600 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-violet-400 z-50 flex items-center gap-2 animate-in slide-in-from-bottom-4 duration-300";
                       if (placedCount > 0) {
                         toast.innerHTML = `<span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping"></span><span>Auto-Optimizer placed ${placedCount} high-density Access Points to eliminate dead-zones!</span>`;
                       } else {
@@ -514,7 +514,7 @@ export default function CADSidebar({
                 <select
                   value={activeAssetTypeFilter}
                   onChange={(e) => onSetAssetTypeFilter(e.target.value)}
-                  className="bg-white border border-slate-220 rounded-lg px-2 py-0.5 text-xs text-slate-700 font-medium focus:outline-none focus:border-blue-500 cursor-pointer"
+                  className="bg-white border border-slate-220 rounded-lg px-2 py-0.5 text-xs text-slate-700 font-medium focus:outline-none focus:border-violet-500 cursor-pointer"
                 >
                   <option value="all">Display All Devices</option>
                   <option value="ap">Access Points (AP)</option>
@@ -548,13 +548,13 @@ export default function CADSidebar({
                           <div className="flex items-center gap-2.5">
                             <div className={`p-2 rounded-lg ${
                               item.category === 'infrastructure' 
-                                ? 'bg-blue-50 text-blue-600 group-hover:bg-blue-100' 
+                                ? 'bg-violet-50 text-violet-600 group-hover:bg-violet-100' 
                                 : 'bg-orange-50 text-orange-650 group-hover:bg-orange-100'
                             } transition-all`}>
                               {item.category === 'infrastructure' ? <Cpu className="w-4 h-4" /> : <Layout className="w-4 h-4" />}
                             </div>
                             <div className="max-w-[180px] md:max-w-xs font-sans">
-                              <span className="text-xs font-bold text-slate-800 group-hover:text-blue-700 block">{item.label}</span>
+                              <span className="text-xs font-bold text-slate-800 group-hover:text-violet-700 block">{item.label}</span>
                               <span className="text-[10.5px] text-slate-500 block leading-tight mt-0.5">{item.desc}</span>
                             </div>
                           </div>
@@ -564,7 +564,7 @@ export default function CADSidebar({
                                 {currentPlacedCount}/{item.count}
                               </span>
                             )}
-                            <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-xs">
+                            <div className="p-1.5 rounded-lg bg-violet-50 text-violet-600 group-hover:bg-violet-600 group-hover:text-white transition-all shadow-xs">
                               <Plus className="w-3.5 h-3.5" />
                             </div>
                           </div>
@@ -581,9 +581,9 @@ export default function CADSidebar({
             <div className="space-y-4 animate-in fade-in duration-200">
               
               {/* quick actions */}
-              <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/30 space-y-3">
+              <div className="p-4 rounded-xl border border-violet-100 bg-violet-50/30 space-y-3">
                 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                  <Settings2 className="w-3.5 h-3.5 text-blue-600" />
+                  <Settings2 className="w-3.5 h-3.5 text-violet-600" />
                   Quick Canvas Actions
                 </h3>
                 
@@ -591,7 +591,7 @@ export default function CADSidebar({
                   <button onClick={onResetCanvas} className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-slate-200 hover:border-red-300 hover:bg-red-50 text-slate-600 hover:text-red-700 text-xs font-bold transition-all shadow-xs">
                     <Trash2 className="w-3.5 h-3.5"/> Blank Canvas
                   </button>
-                  <label className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 text-xs font-bold transition-all shadow-xs cursor-pointer">
+                  <label className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-slate-200 hover:border-violet-300 hover:bg-violet-50 text-slate-600 hover:text-violet-700 text-xs font-bold transition-all shadow-xs cursor-pointer">
                     <Database className="w-3.5 h-3.5"/> Import JSON
                     <input type="file" accept=".json" onChange={async (e) => {
                       const file = e.target.files?.[0];
@@ -619,7 +619,7 @@ export default function CADSidebar({
                           (e.target as HTMLInputElement).value = '';
                         }
                       }}
-                      className="w-full text-xs py-2 pl-8 pr-3 rounded-lg border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-sans"                
+                      className="w-full text-xs py-2 pl-8 pr-3 rounded-lg border border-slate-200 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all font-sans"                
                     />
                     <MessageSquare className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
                   </div>
@@ -630,7 +630,7 @@ export default function CADSidebar({
               <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs space-y-4">
                 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center justify-between border-b border-slate-100 pb-2 mb-1 font-mono">
                   <span className="flex items-center gap-1.5">
-                    <FileImage className="w-3.5 h-3.5 text-blue-600" />
+                    <FileImage className="w-3.5 h-3.5 text-violet-600" />
                     Blueprint Uploader
                   </span>
                   {blueprintImage && (
@@ -645,7 +645,7 @@ export default function CADSidebar({
                   <label 
                     className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
                       blueprintImage 
-                        ? 'border-blue-300 bg-blue-50/20 hover:bg-blue-50/40' 
+                        ? 'border-violet-300 bg-violet-50/20 hover:bg-violet-50/40' 
                         : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50'
                     }`}
                   >
@@ -655,7 +655,7 @@ export default function CADSidebar({
                       onChange={handleFileChange} 
                       className="hidden" 
                     />
-                    <Upload className={`w-6 h-6 mb-2 ${blueprintImage ? 'text-blue-500 animate-bounce' : 'text-slate-400'}`} />
+                    <Upload className={`w-6 h-6 mb-2 ${blueprintImage ? 'text-violet-500 animate-bounce' : 'text-slate-400'}`} />
                     <span className="text-xs font-bold text-slate-700 block">
                       {blueprintImage ? 'Replace active blueprints' : 'Upload floor plan blueprint'}
                     </span>
@@ -666,8 +666,8 @@ export default function CADSidebar({
 
                   {isProcessingFile && (
                     <div className="absolute inset-0 bg-white/85 flex flex-col items-center justify-center rounded-xl space-y-2">
-                      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                      <span className="text-[10px] text-blue-700 font-bold font-mono">Rendering PDF layout to canvas...</span>
+                      <div className="w-5 h-5 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-[10px] text-violet-700 font-bold font-mono">Rendering PDF layout to canvas...</span>
                     </div>
                   )}
                 </div>
@@ -701,7 +701,7 @@ export default function CADSidebar({
                         type="checkbox"
                         checked={blueprintVisible}
                         onChange={(e) => onSetBlueprintVisible(e.target.checked)}
-                        className="w-4 h-4 rounded text-blue-600 accent-blue-600 cursor-pointer"
+                        className="w-4 h-4 rounded text-violet-600 accent-violet-600 cursor-pointer"
                       />
                     </div>
 
@@ -709,7 +709,7 @@ export default function CADSidebar({
                     <div className="space-y-1">
                       <div className="flex items-center justify-between text-[10.5px]">
                         <span className="text-slate-600 font-medium">Layout Target Width (Meters)</span>
-                        <span className="text-blue-700 font-mono font-bold">{blueprintScale}m</span>
+                        <span className="text-violet-700 font-mono font-bold">{blueprintScale}m</span>
                       </div>
                       <input 
                         type="range"
@@ -718,7 +718,7 @@ export default function CADSidebar({
                         step="1"
                         value={blueprintScale}
                         onChange={(e) => onSetBlueprintScale(Number(e.target.value))}
-                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-violet-600"
                       />
                     </div>
 
@@ -726,7 +726,7 @@ export default function CADSidebar({
                     <div className="space-y-1">
                       <div className="flex items-center justify-between text-[10.5px]">
                         <span className="text-slate-600 font-medium">Guide Map Opacity</span>
-                        <span className="text-blue-700 font-mono font-bold">{Math.round(blueprintOpacity * 100)}%</span>
+                        <span className="text-violet-700 font-mono font-bold">{Math.round(blueprintOpacity * 100)}%</span>
                       </div>
                       <input 
                         type="range"
@@ -735,7 +735,7 @@ export default function CADSidebar({
                         step="0.05"
                         value={blueprintOpacity}
                         onChange={(e) => onSetBlueprintOpacity(Number(e.target.value))}
-                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-violet-600"
                       />
                     </div>
 
@@ -777,7 +777,7 @@ export default function CADSidebar({
                           const cleanBase64 = blueprintImage.replace(/^data:image\/[a-z]+;base64,/, '');
                           onDigitizeBlueprint(cleanBase64, mime);
                         }}
-                        className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md transition-all cursor-pointer border border-blue-500/30 disabled:opacity-80"
+                        className="w-full bg-gradient-to-r from-violet-600 to-violet-600 hover:from-violet-700 hover:to-violet-700 text-white font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md transition-all cursor-pointer border border-violet-500/30 disabled:opacity-80"
                       >
                         {isDigitizing ? (
                           <>
@@ -802,7 +802,7 @@ export default function CADSidebar({
               {/* Create dynamic Room Placer form */}
               <form onSubmit={triggerAddRoom} className="p-4 rounded-xl border border-slate-200 bg-slate-50/40 space-y-3">
                 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-200 pb-2 mb-1 font-mono">
-                  <Plus className="w-3.5 h-3.5 text-blue-600" /> Instantiate Custom Modular Space
+                  <Plus className="w-3.5 h-3.5 text-violet-600" /> Instantiate Custom Modular Space
                 </h3>
                 
                 <div className="grid grid-cols-2 gap-2.5">
@@ -814,7 +814,7 @@ export default function CADSidebar({
                       placeholder="e.g. Training Zone Beta"
                       value={newRoomName}
                       onChange={(e) => setNewRoomName(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 placeholder-slate-400 font-sans"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-violet-500 placeholder-slate-400 font-sans"
                     />
                   </div>
                   
@@ -837,7 +837,7 @@ export default function CADSidebar({
                           key={color}
                           type="button"
                           onClick={() => setNewRoomColor(color)}
-                          className={`w-4 h-4 rounded-full border border-slate-300 cursor-pointer ${newRoomColor === color ? 'ring-2 ring-blue-500 scale-110 shadow-sm' : 'opacity-80'}`}
+                          className={`w-4 h-4 rounded-full border border-slate-300 cursor-pointer ${newRoomColor === color ? 'ring-2 ring-violet-500 scale-110 shadow-sm' : 'opacity-80'}`}
                           style={{ backgroundColor: color }}
                         />
                       ))}
@@ -853,7 +853,7 @@ export default function CADSidebar({
                       max="30"
                       value={newRoomWidth}
                       onChange={(e) => setNewRoomWidth(Number(e.target.value))}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-violet-500 font-mono"
                     />
                   </div>
 
@@ -866,14 +866,14 @@ export default function CADSidebar({
                       max="30"
                       value={newRoomDepth}
                       onChange={(e) => setNewRoomDepth(Number(e.target.value))}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-violet-500 font-mono"
                     />
                   </div>
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-xs text-white py-2 rounded-lg font-bold shadow-xs transition-all mt-2 cursor-pointer flex items-center justify-center gap-1.5"
+                  className="w-full bg-violet-600 hover:bg-violet-700 text-xs text-white py-2 rounded-lg font-bold shadow-xs transition-all mt-2 cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Instantiate Room on Grid</span>
@@ -922,9 +922,9 @@ export default function CADSidebar({
               </div>
 
               {/* Intelligent Room Setup Assembler */}
-              <div className="p-3.5 bg-gradient-to-br from-indigo-50/40 via-slate-50 to-slate-100 rounded-xl border border-slate-200/80 space-y-3 shadow-3xs mt-2 text-sans" id="parametric-templates-panel">
+              <div className="p-3.5 bg-gradient-to-br from-violet-50/40 via-slate-50 to-slate-100 rounded-xl border border-slate-200/80 space-y-3 shadow-3xs mt-2 text-sans" id="parametric-templates-panel">
                 <div className="flex items-center gap-1.5 font-sans">
-                  <Layers className="w-4 h-4 text-blue-600" />
+                  <Layers className="w-4 h-4 text-violet-600" />
                   <span className="text-xs font-bold text-slate-800 tracking-tight font-sans">Deploy Parametric Setups / Fittings</span>
                 </div>
                 <p className="text-[10px] text-slate-500 leading-tight">
@@ -937,7 +937,7 @@ export default function CADSidebar({
                     <select
                       id="template-target-room"
                       defaultValue={rooms[0]?.id || ''}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-850 focus:outline-none focus:border-blue-500 font-sans cursor-pointer font-semibold font-sans"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-850 focus:outline-none focus:border-violet-500 font-sans cursor-pointer font-semibold font-sans"
                     >
                       {rooms.map(r => (
                         <option key={r.id} value={r.id}>{r.name}</option>
@@ -949,7 +949,7 @@ export default function CADSidebar({
                     <label className="text-[9px] font-bold text-slate-400 block font-mono">Select Functional Setup Blueprint</label>
                     <select
                       id="template-type-select"
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-850 focus:outline-none focus:border-blue-500 font-sans cursor-pointer font-semibold font-sans"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-850 focus:outline-none focus:border-violet-500 font-sans cursor-pointer font-semibold font-sans"
                     >
                       <option value="boardroom_8">8-Person Boardroom (Specs-loaded Table & A/V)</option>
                       <option value="workstations_4">4-Pax Agile Workspace Group (Bench, Chairs, Data Port)</option>
@@ -966,7 +966,7 @@ export default function CADSidebar({
                         onApplyRoomSetupTemplate(roomEl.value, tempEl.value);
                       }
                     }}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-[10.5px] font-bold py-1.5 rounded-lg shadow-sm font-sans transition-all flex items-center justify-center gap-1 cursor-pointer mt-1 font-sans"
+                    className="w-full bg-violet-600 hover:bg-violet-700 text-white text-[10.5px] font-bold py-1.5 rounded-lg shadow-sm font-sans transition-all flex items-center justify-center gap-1 cursor-pointer mt-1 font-sans"
                   >
                     <Sparkles className="w-3.5 h-3.5" />
                     <span>Apply Arrangement Fitting</span>
@@ -988,7 +988,7 @@ export default function CADSidebar({
                     placeholder="Search MAC, ports, names, Ext..."
                     value={assetSearchQuery}
                     onChange={(e) => setAssetSearchQuery(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-9 py-2.5 text-xs text-slate-700 placeholder-slate-405 focus:outline-none focus:border-blue-500 font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-9 py-2.5 text-xs text-slate-700 placeholder-slate-405 focus:outline-none focus:border-violet-500 font-mono"
                   />
                 </div>
 
@@ -1001,7 +1001,7 @@ export default function CADSidebar({
                       onClick={() => setFilterTypeSelector(type)}
                       className={`px-2.5 py-1.5 rounded-full text-[9.5px] border font-bold uppercase tracking-wider shrink-0 transition-all cursor-pointer ${
                         filterTypeSelector === type 
-                          ? 'bg-blue-600 text-white border-blue-600 font-bold' 
+                          ? 'bg-violet-600 text-white border-violet-600 font-bold' 
                           : 'bg-slate-55 text-slate-500 border-slate-200 hover:text-slate-800 hover:bg-slate-100'
                       }`}
                     >
@@ -1021,7 +1021,7 @@ export default function CADSidebar({
                 </div>
                 <div className="space-y-0.5 border-l border-slate-200 pl-3">
                   <span className="text-[9px] uppercase font-mono text-slate-400 tracking-wider font-bold">Active Data Ports</span>
-                  <p className="text-lg font-bold font-mono text-blue-600 flex items-baseline gap-1">
+                  <p className="text-lg font-bold font-mono text-violet-600 flex items-baseline gap-1">
                     {lowCurrentMetrics.dp} <span className="text-[10px] font-normal text-slate-400">patched</span>
                   </p>
                 </div>
@@ -1050,7 +1050,7 @@ export default function CADSidebar({
                     <button
                       type="button"
                       onClick={handleExportCSV}
-                      className="text-[10px] font-bold text-blue-600 hover:text-blue-755 flex items-center gap-1 cursor-pointer font-sans"
+                      className="text-[10px] font-bold text-violet-600 hover:text-violet-755 flex items-center gap-1 cursor-pointer font-sans"
                     >
                       <FileSpreadsheet className="w-3 h-3" />
                       <span>Export CSV</span>
@@ -1132,7 +1132,7 @@ export default function CADSidebar({
           <div className="space-y-3 animate-in slide-in-from-bottom duration-150 font-sans" id="active-asset-inspector-panel">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs uppercase font-mono">
-                <Settings2 className="w-4 h-4 text-blue-600 animate-spin" style={{ animationDuration: '8s' }} />
+                <Settings2 className="w-4 h-4 text-violet-600 animate-spin" style={{ animationDuration: '8s' }} />
                 <span>Entity Inspector</span>
               </div>
               <button
@@ -1158,7 +1158,7 @@ export default function CADSidebar({
                     selectedAsset.rotationY,
                     selectedAsset.assignedRoomId
                   )}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-800 focus:outline-none focus:border-blue-500 font-sans font-medium hover:border-slate-300 transition-all font-sans"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-800 focus:outline-none focus:border-violet-500 font-sans font-medium hover:border-slate-300 transition-all font-sans"
                 />
               </div>
 
@@ -1174,7 +1174,7 @@ export default function CADSidebar({
                     selectedAsset.rotationY,
                     e.target.value === 'unassigned' ? undefined : e.target.value
                   )}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-slate-700 focus:outline-none focus:border-blue-500 font-sans text-xs font-semibold cursor-pointer"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-slate-700 focus:outline-none focus:border-violet-500 font-sans text-xs font-semibold cursor-pointer"
                 >
                   <option value="unassigned font-bold font-mono">Unassigned (Free Flowing)</option>
                   {rooms.map((rm) => (
@@ -1187,7 +1187,7 @@ export default function CADSidebar({
               <div className="space-y-1 col-span-2 flex flex-col gap-0.5">
                 <div className="flex justify-between items-center">
                   <label className="text-[9px] font-bold text-slate-400 font-mono">Orient Angle (Rotation)</label>
-                  <span className="text-[10px] text-blue-600 font-mono font-bold">{(selectedAsset.rotationY * (180 / Math.PI)).toFixed(0)}°</span>
+                  <span className="text-[10px] text-violet-600 font-mono font-bold">{(selectedAsset.rotationY * (180 / Math.PI)).toFixed(0)}°</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <input
@@ -1203,7 +1203,7 @@ export default function CADSidebar({
                       Number(e.target.value),
                       selectedAsset.assignedRoomId
                     )}
-                    className="w-full h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                    className="w-full h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-violet-600"
                   />
                   <button
                     type="button"
@@ -1247,7 +1247,7 @@ export default function CADSidebar({
                         updated[key] = e.target.value;
                         onUpdateAssetSpecs(selectedAsset.id, updated, selectedAsset.name, selectedAsset.rotationY, selectedAsset.assignedRoomId);
                       }}
-                      className="w-full bg-slate-55 border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-850 focus:outline-none focus:border-blue-500 font-mono"
+                      className="w-full bg-slate-55 border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-850 focus:outline-none focus:border-violet-500 font-mono"
                     />
                   </div>
                 );
@@ -1257,7 +1257,7 @@ export default function CADSidebar({
               <div className="mt-3 bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono flex items-center gap-1">
-                    <Hammer className="w-3.5 h-3.5 text-blue-600" /> Parametric BIM Actions
+                    <Hammer className="w-3.5 h-3.5 text-violet-600" /> Parametric BIM Actions
                   </span>
                 </div>
 
@@ -1277,12 +1277,12 @@ export default function CADSidebar({
                       onUpdateAssetSpecs(selectedAsset.id, updated, selectedAsset.name, selectedAsset.rotationY, selectedAsset.assignedRoomId);
 
                       const toast = document.createElement('div');
-                      toast.className = "fixed bottom-14 right-5 bg-indigo-600 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl z-50 flex items-center gap-1.5 animate-in slide-in-from-bottom-4 duration-300";
+                      toast.className = "fixed bottom-14 right-5 bg-violet-600 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl z-50 flex items-center gap-1.5 animate-in slide-in-from-bottom-4 duration-300";
                       toast.innerHTML = `<span>Populated parametric spec values matching Steelcase/Aruba standard benchmarks!</span>`;
                       document.body.appendChild(toast);
                       setTimeout(() => toast.remove(), 3500);
                     }}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white text-[10.5px] font-bold py-1 px-2.5 rounded-lg transition-all text-center cursor-pointer shadow-3xs"
+                    className="w-full bg-violet-600 hover:bg-violet-700 text-white text-[10.5px] font-bold py-1 px-2.5 rounded-lg transition-all text-center cursor-pointer shadow-3xs"
                   >
                     Load Standard BIM Specs
                   </button>
@@ -1295,7 +1295,7 @@ export default function CADSidebar({
                     placeholder="e.g. Weight or FireRating"
                     value={customParamName}
                     onChange={(e) => setCustomParamName(e.target.value)}
-                    className="flex-1 bg-white border border-slate-200 rounded-md px-2 py-1 text-[10.5px] text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 font-mono"
+                    className="flex-1 bg-white border border-slate-200 rounded-md px-2 py-1 text-[10.5px] text-slate-800 placeholder-slate-400 focus:outline-none focus:border-violet-500 font-mono"
                   />
                   <button
                     type="button"
