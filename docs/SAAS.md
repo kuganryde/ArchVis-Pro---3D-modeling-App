@@ -74,10 +74,19 @@ autosave). Local mode still inlines a data URL in localStorage.
   replaced/removed objects. Legacy projects with an inline `blueprintImage` still
   load.
 
+**Plan entitlements (implemented).** Free-plan PNG/PDF exports carry a tiled
+"ArchViz Pro · Free" watermark (`src/utils/watermark.ts`); Pro/Team and local
+mode export cleanly (`allowsCleanExports(plan)`).
+
+**AI-result caching (implemented).** Hosted AI now caches results per workspace
+(`supabase/migrations/0005_ai_cache.sql`, keyed by a sha256 of the input). A
+repeat digitize/rebuild with identical input returns the stored layout instantly,
+**free — no Gemini call and no credit consumed**. The cache degrades to a miss if
+the table is absent, so it's safe to deploy before applying the migration.
+
 **Still to do in this milestone:**
 
-- **Entitlements by plan** beyond project/AI limits (e.g. watermarked exports on Free).
-- **Caching** of AI digitization results (large images are the main COGS).
+- **Team roles & collaboration** — invite members with roles; enforce permissions.
 
 ## Milestone 3 — moat & expansion
 
