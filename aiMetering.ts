@@ -141,6 +141,69 @@ async function putCache(workspaceId: string, key: string, kind: string, result: 
   }
 }
 
+/**
+ * Cache-then-generate: return a cached layout free (no credit) when the exact
+ * input was seen before; otherwise enforce the credit limit, call Gemini,
+ * cache the result and consume one credit.
+ */
+async function handle(
+  res: Response,
+  ctx: { workspaceId: string; plan: PlanId },
+  kind: string,
+  key: string,
+  contents: any
+) {
+  // 1. Cache hit — free, instant, no credit consumed.
+  const cached = await getCached(ctx.workspaceId, key);
+  if (cached) return res.json({ ...cached, _cached: true });
+
+  // 2. Miss — enforce the monthly limit before spending a Gemini call.
+  if (await creditBlocked(res, ctx.workspaceId, ctx.plan)) return;
+
+  const ai = getGeminiClient(); // platform key
+  if (!ai) return res.status(503).json({ error: "Hosted AI is not available." });
+  try {
+    const response = await generateLayoutWithRetry(ai, contents);
+    const data = JSON.parse(response.text || "{}");
+    await putCache(ctx.workspaceId, key, kind, data); // cache before metering
+    const used = await consumeCredit(ctx.workspaceId); // only meter on success
+    return res.json({ ...data, _usage: used });
+  } catch (error: any) {
+    const status = error instanceof GeminiRequestError ? error.status : 500;
+    return res.status(status).json({ error: error?.message || "AI generation failed." });
+  }
+}
+
+/**
+ * Hosted, metered blueprint digitize. Requires a Supabase JWT + workspace
+ * membership; enforces the plan's monthly credit limit. Exported so the legacy
+ * `/api/digitize-blueprint` route can delegate to it when no BYOK key is sent,
+ * instead of silently using the platform key unauthenticated.
+ */
+export async function meteredDigitize(req: Request, res: Response) {
+  const ctx = await authWorkspace(req, res);
+  if (!ctx) return;
+  const { base64Data, mimeType } = req.body as { base64Data?: string; mimeType?: string };
+  if (!base64Data) return res.status(400).json({ error: "Missing base64Data of the blueprint." });
+  const key = cacheKey("digitize", `${mimeType || "image/png"}|${base64Data}`);
+  const imagePart = { inlineData: { data: base64Data, mimeType: mimeType || "image/png" } };
+  return handle(res, ctx, "digitize", key, [imagePart, { text: DIGITIZE_PROMPT }]);
+}
+
+/**
+ * Hosted, metered rebuild-from-prompt. Requires a Supabase JWT + workspace
+ * membership; enforces the plan's monthly credit limit. Exported so the legacy
+ * `/api/rebuild-from-prompt` route can delegate to it.
+ */
+export async function meteredRebuild(req: Request, res: Response) {
+  const ctx = await authWorkspace(req, res);
+  if (!ctx) return;
+  const { prompt } = req.body as { prompt?: string };
+  if (!prompt) return res.status(400).json({ error: "No prompt provided." });
+  const key = cacheKey("rebuild", prompt.trim().toLowerCase());
+  return handle(res, ctx, "rebuild", key, [{ text: buildRebuildInstructions(prompt) }]);
+}
+
 export function registerMeteredAiRoutes(app: Express) {
   // Remaining hosted-AI credits for the current month.
   app.get("/api/ai/usage", async (req: Request, res: Response) => {
@@ -161,55 +224,6 @@ export function registerMeteredAiRoutes(app: Express) {
     });
   });
 
-  /**
-   * Cache-then-generate: return a cached layout free (no credit) when the exact
-   * input was seen before; otherwise enforce the credit limit, call Gemini,
-   * cache the result and consume one credit.
-   */
-  const handle = async (
-    res: Response,
-    ctx: { workspaceId: string; plan: PlanId },
-    kind: string,
-    key: string,
-    contents: any
-  ) => {
-    // 1. Cache hit — free, instant, no credit consumed.
-    const cached = await getCached(ctx.workspaceId, key);
-    if (cached) return res.json({ ...cached, _cached: true });
-
-    // 2. Miss — enforce the monthly limit before spending a Gemini call.
-    if (await creditBlocked(res, ctx.workspaceId, ctx.plan)) return;
-
-    const ai = getGeminiClient(); // platform key
-    if (!ai) return res.status(503).json({ error: "Hosted AI is not available." });
-    try {
-      const response = await generateLayoutWithRetry(ai, contents);
-      const data = JSON.parse(response.text || "{}");
-      await putCache(ctx.workspaceId, key, kind, data); // cache before metering
-      const used = await consumeCredit(ctx.workspaceId); // only meter on success
-      return res.json({ ...data, _usage: used });
-    } catch (error: any) {
-      const status = error instanceof GeminiRequestError ? error.status : 500;
-      return res.status(status).json({ error: error?.message || "AI generation failed." });
-    }
-  };
-
-  app.post("/api/ai/digitize", async (req: Request, res: Response) => {
-    const ctx = await authWorkspace(req, res);
-    if (!ctx) return;
-    const { base64Data, mimeType } = req.body as { base64Data?: string; mimeType?: string };
-    if (!base64Data) return res.status(400).json({ error: "Missing base64Data of the blueprint." });
-    const key = cacheKey("digitize", `${mimeType || "image/png"}|${base64Data}`);
-    const imagePart = { inlineData: { data: base64Data, mimeType: mimeType || "image/png" } };
-    return handle(res, ctx, "digitize", key, [imagePart, { text: DIGITIZE_PROMPT }]);
-  });
-
-  app.post("/api/ai/rebuild", async (req: Request, res: Response) => {
-    const ctx = await authWorkspace(req, res);
-    if (!ctx) return;
-    const { prompt } = req.body as { prompt?: string };
-    if (!prompt) return res.status(400).json({ error: "No prompt provided." });
-    const key = cacheKey("rebuild", prompt.trim().toLowerCase());
-    return handle(res, ctx, "rebuild", key, [{ text: buildRebuildInstructions(prompt) }]);
-  });
+  app.post("/api/ai/digitize", meteredDigitize);
+  app.post("/api/ai/rebuild", meteredRebuild);
 }

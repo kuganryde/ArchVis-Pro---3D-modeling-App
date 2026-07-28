@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import { DIGITIZE_PROMPT, buildRebuildInstructions } from "./src/shared/geminiSpec";
 import { getGeminiClient, generateLayoutWithRetry, GeminiRequestError } from "./serverGemini";
 import { registerStripeWebhook, registerBillingRoutes, isBillingConfigured } from "./billing";
-import { registerMeteredAiRoutes, isHostedAiConfigured } from "./aiMetering";
+import { registerMeteredAiRoutes, isHostedAiConfigured, meteredDigitize, meteredRebuild } from "./aiMetering";
 
 dotenv.config();
 
@@ -29,27 +29,36 @@ registerBillingRoutes(app);
 registerMeteredAiRoutes(app);
 
 // ---------------------------------------------------------------------------
-// BYOK proxy endpoints (below): accept a per-request Gemini key header and are
-// unmetered. The client normally calls Gemini directly for BYOK, but these keep
-// working for server-key deployments and API consumers. Hosted/metered AI lives
-// in aiMetering.ts.
+// Legacy AI endpoints (below). These accept a caller-supplied Gemini key via the
+// `x-gemini-api-key` header (BYOK — the caller's own key, unmetered). When NO
+// key header is present they do NOT silently fall back to the platform key;
+// instead they delegate to the hosted, metered path, which requires a Supabase
+// JWT + workspace membership and enforces the plan's monthly credit limit. This
+// prevents the endpoints from acting as an open, unauthenticated proxy onto the
+// platform GEMINI_API_KEY. Native hosted/metered AI lives at /api/ai/* in
+// aiMetering.ts.
 // ---------------------------------------------------------------------------
+
+/** A trimmed, non-empty BYOK key from the request header, or undefined. */
+const byokKey = (req: express.Request): string | undefined => {
+  const raw = (req.headers["x-gemini-api-key"] as string | undefined)?.trim();
+  return raw ? raw : undefined;
+};
 
 // API route to parse CAD blueprint / floor plans
 app.post("/api/digitize-blueprint", async (req, res) => {
+  const clientKey = byokKey(req);
+  // No BYOK key -> require auth + meter (never the unauthenticated platform key).
+  if (!clientKey) return meteredDigitize(req, res);
   try {
     const { base64Data, mimeType } = req.body;
-
     if (!base64Data) {
       return res.status(400).json({ error: "Missing base64Data of the blueprint file." });
     }
 
-    const clientKey = req.headers['x-gemini-api-key'] as string;
-    const ai = getGeminiClient(clientKey);
+    const ai = getGeminiClient(clientKey); // caller's own key only
     if (!ai) {
-      return res.status(503).json({
-        error: "Gemini API Key is required. Please provide it in the UI."
-      });
+      return res.status(503).json({ error: "Gemini API Key is required. Please provide it in the UI." });
     }
 
     // Package the file inline data for Gemini Vision capabilities
@@ -74,12 +83,14 @@ app.post("/api/digitize-blueprint", async (req, res) => {
 
 // API route to rebuild CAD floor plan from prompt
 app.post("/api/rebuild-from-prompt", async (req, res) => {
+  const clientKey = byokKey(req);
+  // No BYOK key -> require auth + meter (never the unauthenticated platform key).
+  if (!clientKey) return meteredRebuild(req, res);
   try {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ error: "No prompt provided." });
-    
-    const clientKey = req.headers['x-gemini-api-key'] as string;
-    const ai = getGeminiClient(clientKey);
+
+    const ai = getGeminiClient(clientKey); // caller's own key only
     if (!ai) return res.status(503).json({ error: "Gemini API Key is required. Please provide it in the UI." });
 
     // Reuse the same retry + schema pipeline as the digitizer so the response is
