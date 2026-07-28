@@ -23,6 +23,7 @@ import {
 import { PlacedAsset, RoomDefinition } from '../types';
 import { isOverlapping, isAssetOutsideRooms } from '../utils/geometry';
 import { showToast } from '../utils/toast';
+import BomPanel from './BomPanel';
 
 interface CADSidebarProps {
   rooms: RoomDefinition[];
@@ -1037,6 +1038,9 @@ export default function CADSidebar({
                   </p>
                 </div>
               </div>
+
+              {/* Bill of Materials */}
+              <BomPanel assets={assets} />
 
               {/* Dynamic Inventory Table */}
               <div className="space-y-2">

@@ -12,6 +12,7 @@ import { findContainingRoom, getDefaultHeight, isInfrastructureType, makeId } fr
 import { mapApiLayout } from './utils/layout';
 import { saveDesign, loadDesign, clearDesign } from './utils/persistence';
 import { showToast } from './utils/toast';
+import { computeBom, formatMoney } from './utils/bom';
 import { digitizeBlueprintClient, rebuildFromPromptClient } from './utils/gemini';
 import { digitizeBlueprintHosted, rebuildFromPromptHosted } from './lib/aiHosted';
 import {
@@ -605,6 +606,22 @@ export default function App({
       })
       .join('');
 
+    // Bill of materials for the report.
+    const bom = computeBom(assets);
+    const bomRows = bom.lines
+      .map(
+        (l) =>
+          `<tr><td>${l.item}${l.estimated ? ' <span style="color:#d97706">(est.)</span>' : ''}</td><td>${l.manufacturer}</td><td style="text-align:right">${l.quantity}</td><td style="text-align:right">${formatMoney(l.unitCost)}</td><td style="text-align:right">${formatMoney(l.lineTotal)}</td></tr>`
+      )
+      .join('');
+    const bomTable = bom.lines.length
+      ? `<h2>Bill of Materials</h2>
+         <table><thead><tr><th>Item</th><th>Manufacturer</th><th style="text-align:right">Qty</th><th style="text-align:right">Unit</th><th style="text-align:right">Total</th></tr></thead>
+         <tbody>${bomRows}
+         <tr><td colspan="4" style="text-align:right;font-weight:700">Grand Total</td><td style="text-align:right;font-weight:700">${formatMoney(bom.grandTotal)}</td></tr>
+         </tbody></table>`
+      : '';
+
     const win = window.open('', '_blank');
     if (!win) {
       showToast('Pop-up blocked. Allow pop-ups to export the PDF report.', 'error');
@@ -627,10 +644,12 @@ export default function App({
         <div><b>${rooms.length}</b>Rooms</div>
         <div><b>${assets.length}</b>Assets</div>
         <div><b>${Math.round(totalArea)}</b>Total sqft</div>
+        <div><b>${formatMoney(bom.grandTotal)}</b>Est. value</div>
       </div>
       ${snapshot ? `<img src="${snapshot}" alt="Floor plan snapshot" />` : ''}
       <h2>Room Summary</h2>
       <table><thead><tr><th>Room</th><th>Area</th><th>Assets</th></tr></thead><tbody>${roomRows}</tbody></table>
+      ${bomTable}
       <h2>Asset Inventory</h2>
       <table><thead><tr><th>Name</th><th>Type</th><th>Category</th><th>Room</th><th>X, Z (m)</th></tr></thead><tbody>${assetRows}</tbody></table>
       </body></html>`);
