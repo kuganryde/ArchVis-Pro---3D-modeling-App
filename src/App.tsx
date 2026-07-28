@@ -965,7 +965,7 @@ export default function App({
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 ml-1">Gemini AI Studio API Key</label>
+                <label className="text-xs font-bold text-slate-700 ml-1">Gemini API Key</label>
                 <div className="relative">
                   <input
                     type="password"

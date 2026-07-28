@@ -1,6 +1,0 @@
-{
-  "name": "ArchViz Pro — AI Digital Twin Platform",
-  "description": "ArchViz Pro is an AI-powered 3D digital-twin platform for office floor plans and low-current (network / AV) infrastructure — interactive layouts, Wi-Fi & occupancy overlays, AI blueprint digitization, bill of materials, and team workspaces.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
