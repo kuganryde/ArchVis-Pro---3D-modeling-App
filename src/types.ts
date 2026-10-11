@@ -65,6 +65,18 @@ export interface RoomDefinition {
   // Optional explicit wall finish. When omitted it is derived from the room
   // name (see getRoomWallStyle) so imported / AI layouts still render sensibly.
   wallStyle?: 'glass' | 'concrete';
+  /** Floor this room belongs to. Optional so pre-multi-floor designs still load. */
+  levelId?: string;
+}
+
+/** One storey of a building. Rooms and assets reference it by `levelId`. */
+export interface Level {
+  id: string;
+  name: string;
+  /** Floor-to-floor elevation of this level's slab above ground (metres). */
+  elevation: number;
+  /** Floor-to-ceiling height (metres). */
+  height: number;
 }
 
 export interface PlacedAsset {
@@ -79,4 +91,6 @@ export interface PlacedAsset {
   specs?: Record<string, string>;
   // For UI state
   assignedRoomId?: string;
+  /** Floor this asset sits on. Optional so pre-multi-floor designs still load. */
+  levelId?: string;
 }

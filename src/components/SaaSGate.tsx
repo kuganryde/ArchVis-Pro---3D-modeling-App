@@ -90,7 +90,7 @@ function WorkspaceView({ userId, email }: { userId: string; email: string }) {
     uploadingRef.current = null;
     let blueprintImage: string | null = d.blueprintImage ?? null; // legacy inline
     if (d.blueprintPath) blueprintImage = await getBlueprintUrl(d.blueprintPath);
-    return { rooms: d.rooms ?? [], assets: d.assets ?? [], blueprintImage };
+    return { levels: d.levels, rooms: d.rooms ?? [], assets: d.assets ?? [], blueprintImage };
   }, []);
 
   // Load a workspace's projects, plan, role and its first project.
@@ -250,7 +250,7 @@ function WorkspaceView({ userId, email }: { userId: string; email: string }) {
           }
 
           // Save only the compact path — never the multi-MB base64 blob.
-          await saveProjectDesign(projId, { rooms: d.rooms, assets: d.assets, blueprintPath: path });
+          await saveProjectDesign(projId, { levels: d.levels, rooms: d.rooms, assets: d.assets, blueprintPath: path });
         } catch (e: any) {
           showToast(e?.message || 'Cloud save failed.', 'error');
         }
