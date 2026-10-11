@@ -60,7 +60,9 @@ export const PLAN_ORDER: PlanId[] = ['free', 'pro', 'team'];
 
 /** How many projects a plan permits (null = unlimited). */
 export function maxProjectsForPlan(plan: PlanId): number | null {
-  return PLANS[plan]?.maxProjects ?? PLANS.free.maxProjects;
+  // Not `??`: null means "unlimited" and must not fall back to the Free limit.
+  const p = PLANS[plan] ?? PLANS.free;
+  return p.maxProjects;
 }
 
 /** Monthly hosted-AI generation allowance for a plan (null = unlimited). */

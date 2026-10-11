@@ -39,6 +39,9 @@ is **server-only** — never expose secret keys to the client.
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `PORT` | No | Port to bind (defaults to 3000). |
+| `TRUST_PROXY` | Recommended | Reverse-proxy hops in front of the server (default `1` in production, `0` locally). Required for correct per-IP rate limiting. See `SECURITY.md`. |
+| `API_RATE_LIMIT` / `AI_RATE_LIMIT` | No | Requests per minute per IP for `/api` (default 120) and the AI routes (default 10). |
+| `CSP_REPORT_ONLY` | No | `true` reports CSP violations without blocking (use when changing the policy). |
 | `APP_URL` | Recommended | Public base URL, used for Stripe redirect links. Falls back to request origin. |
 | `GEMINI_API_KEY` | Hosted AI | Platform Gemini key for metered AI. |
 | `SUPABASE_URL` | Billing / AI | Supabase URL for the server (falls back to `VITE_SUPABASE_URL`). |
