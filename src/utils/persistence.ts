@@ -3,7 +3,7 @@
  * assets purely in React state, so a refresh wiped the whole layout. We now
  * autosave a versioned snapshot to localStorage and restore it on load.
  */
-import { PlacedAsset, RoomDefinition } from '../types';
+import { Level, PlacedAsset, RoomDefinition } from '../types';
 
 const STORAGE_KEY = 'archviz_pro_design_v1';
 const STORAGE_VERSION = 1;
@@ -14,13 +14,16 @@ export interface PersistedDesign {
   rooms: RoomDefinition[];
   assets: PlacedAsset[];
   blueprintImage: string | null;
+  /** Floors. Optional: designs saved before multi-floor have none (see normalizeDesign). */
+  levels?: Level[];
 }
 
 /** Persist the current design. Silently no-ops if storage is unavailable/full. */
 export function saveDesign(
   rooms: RoomDefinition[],
   assets: PlacedAsset[],
-  blueprintImage: string | null
+  blueprintImage: string | null,
+  levels?: Level[]
 ): void {
   try {
     const payload: PersistedDesign = {
@@ -29,6 +32,7 @@ export function saveDesign(
       rooms,
       assets,
       blueprintImage,
+      levels,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch (err) {

@@ -3,14 +3,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import ThreeCanvas from './components/ThreeCanvas';
 import CADSidebar from './components/CADSidebar';
 import { DEFAULT_ROOMS, DEFAULT_ASSETS } from './data/defaultFloorPlan';
-import { PlacedAsset, RoomDefinition } from './types';
+import { Level, PlacedAsset, RoomDefinition } from './types';
 import { findContainingRoom, getDefaultHeight, isInfrastructureType, makeId } from './utils/geometry';
 import { mapApiLayout } from './utils/layout';
 import { saveDesign, loadDesign, clearDesign } from './utils/persistence';
+import { useDocumentHistory } from './hooks/useDocumentHistory';
+import LevelBar from './components/LevelBar';
+import { escapeHtml } from './utils/html';
+import {
+  Design, normalizeDesign, entitiesForLevel, addLevel, renameLevel, deleteLevel,
+  duplicateLevel, replaceLevelContent, summarizeLevels,
+} from './utils/levels';
 import { showToast } from './utils/toast';
 import Logo, { Wordmark } from './components/Logo';
 import LegalModal from './components/LegalModal';
@@ -35,7 +42,9 @@ import {
   Image as ImageIcon,
   FileText,
   Copy,
-  Download
+  Download,
+  Undo2,
+  Redo2
 } from 'lucide-react';
 
 // Google Analytics measurement ID, configured via the VITE_GA_MEASUREMENT_ID
@@ -46,6 +55,8 @@ export interface AppDesign {
   rooms: RoomDefinition[];
   assets: PlacedAsset[];
   blueprintImage: string | null;
+  /** Floors. Optional so pre-multi-floor projects still load (they become "Level 1"). */
+  levels?: Level[];
 }
 
 export interface AppProps {
@@ -77,14 +88,50 @@ export default function App({
     rooms: localPersisted?.rooms ?? DEFAULT_ROOMS,
     assets: localPersisted?.assets ?? DEFAULT_ASSETS,
     blueprintImage: localPersisted?.blueprintImage ?? null,
+    levels: localPersisted?.levels,
   };
 
-  const [rooms, setRooms] = useState<RoomDefinition[]>(seed.rooms);
-  const [assets, setAssets] = useState<PlacedAsset[]>(seed.assets);
+  // The editable document (floors + rooms + assets) lives in an undo/redo history.
+  // `allRooms` / `allAssets` span the whole building; `rooms` / `assets` below are
+  // the ACTIVE floor only and are what the canvas, sidebar and inspector see.
+  const { doc, update, undo, redo, endGesture, reset: resetDoc, canUndo, canRedo } =
+    useDocumentHistory<Design>(() => normalizeDesign(seed));
+  const allRooms = doc.rooms;
+  const allAssets = doc.assets;
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [activeLevelIdState, setActiveLevelId] = useState<string>(doc.levels[0].id);
+  // Undo/redo can remove the active floor (e.g. undoing "add floor"): fall back safely.
+  const activeLevel = doc.levels.find((l) => l.id === activeLevelIdState) ?? doc.levels[0];
+  const activeLevelId = activeLevel.id;
+  const { rooms, assets } = useMemo(() => entitiesForLevel(doc, activeLevelId), [doc, activeLevelId]);
+  const [historyNotice, setHistoryNotice] = useState('');
 
   // Snapshot function registered by ThreeCanvas for PNG exports.
   const captureRef = useRef<(() => string | null) | null>(null);
+
+  // Undo / redo with a screen-reader announcement.
+  const handleUndo = useCallback(() => { undo(); setHistoryNotice('Undid last change'); }, [undo]);
+  const handleRedo = useCallback(() => { redo(); setHistoryNotice('Redid change'); }, [redo]);
+
+  // Ctrl/Cmd+Z undo, Ctrl/Cmd+Shift+Z or Ctrl+Y redo. Ignored while typing in a
+  // field so the browser's native text undo keeps working there.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const key = e.key.toLowerCase();
+      if (key === 'z' && !e.shiftKey) { e.preventDefault(); handleUndo(); }
+      else if ((key === 'z' && e.shiftKey) || key === 'y') { e.preventDefault(); handleRedo(); }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [handleUndo, handleRedo]);
+
+  // Drop a selection that no longer exists on the visible floor (undo, floor switch).
+  useEffect(() => {
+    if (selectedAssetId && !assets.some((a) => a.id === selectedAssetId)) setSelectedAssetId(null);
+  }, [assets, selectedAssetId]);
 
   // Gemini BYOK (Bring Your Own Key) State
   const [geminiApiKey, setGeminiApiKey] = useState<string>('');
@@ -289,7 +336,7 @@ export default function App({
       specs: defaultSpecs
     };
 
-    setAssets((prev) => [...prev, newAsset]);
+    update((d) => ({ ...d, assets: [...d.assets, { ...newAsset, levelId: activeLevelId }] }));
     setSelectedAssetId(uid); // Focus instantly for spec customization
   };
 
@@ -301,10 +348,15 @@ export default function App({
     rotationY: number,
     roomId?: string
   ) => {
-    setAssets((prev) =>
-      prev.map((a) =>
-        a.id === id ? { ...a, specs, name, rotationY, assignedRoomId: roomId } : a
-      )
+    // Typing in the inspector fires per keystroke: coalesce into one undo step.
+    update(
+      (d) => ({
+        ...d,
+        assets: d.assets.map((a) =>
+          a.id === id ? { ...a, specs, name, rotationY, assignedRoomId: roomId } : a
+        ),
+      }),
+      { coalesceKey: `specs:${id}` }
     );
   };
 
@@ -313,21 +365,27 @@ export default function App({
     // Find if the coordinates fall within any room boundaries dynamically
     const containingRoom = findContainingRoom(x, z, rooms);
 
-    setAssets((prev) =>
-      prev.map((a) =>
-        a.id === id
-          ? {
-              ...a,
-              position: { ...a.position, x, z },
-              assignedRoomId: containingRoom ? containingRoom.id : undefined,
-            }
-          : a
-      )
+    // One drag = one undo step (closed by the canvas's onDragEnd). Returning the
+    // same document when the asset did not actually move avoids empty steps.
+    update(
+      (d) => {
+        const current = d.assets.find((a) => a.id === id);
+        if (!current || (current.position.x === x && current.position.z === z)) return d;
+        return {
+          ...d,
+          assets: d.assets.map((a) =>
+            a.id === id
+              ? { ...a, position: { ...a.position, x, z }, assignedRoomId: containingRoom ? containingRoom.id : undefined }
+              : a
+          ),
+        };
+      },
+      { coalesceKey: `move:${id}`, windowMs: 60_000 }
     );
   };
 
   const handleDeleteAsset = (id: string) => {
-    setAssets((prev) => prev.filter((a) => a.id !== id));
+    update((d) => ({ ...d, assets: d.assets.filter((a) => a.id !== id) }));
     if (selectedAssetId === id) setSelectedAssetId(null);
   };
 
@@ -341,16 +399,18 @@ export default function App({
       id: rId,
       x: 0,
       z: Math.max(-12, Math.min(12, offsetZ)),
+      levelId: activeLevelId,
     };
-    setRooms((prev) => [...prev, room]);
+    update((d) => ({ ...d, rooms: [...d.rooms, room] }));
   };
 
   const handleDeleteRoom = (id: string) => {
-    setRooms((prev) => prev.filter((r) => r.id !== id));
-    // Re-assign assets previously bound to this space to unassigned
-    setAssets((prev) =>
-      prev.map((a) => (a.assignedRoomId === id ? { ...a, assignedRoomId: undefined } : a))
-    );
+    // Single commit: removing the room and un-binding its assets is ONE undo step.
+    update((d) => ({
+      ...d,
+      rooms: d.rooms.filter((r) => r.id !== id),
+      assets: d.assets.map((a) => (a.assignedRoomId === id ? { ...a, assignedRoomId: undefined } : a)),
+    }));
   };
 
   // Blueprint trace ground underlay states
@@ -367,11 +427,12 @@ export default function App({
   // cloud via onPersist; in local mode it falls back to localStorage.
   useEffect(() => {
     const handle = setTimeout(() => {
-      if (onPersist) onPersist({ rooms, assets, blueprintImage });
-      else saveDesign(rooms, assets, blueprintImage);
+      // Persist the WHOLE building, not just the visible floor.
+      if (onPersist) onPersist({ levels: doc.levels, rooms: doc.rooms, assets: doc.assets, blueprintImage });
+      else saveDesign(doc.rooms, doc.assets, blueprintImage, doc.levels);
     }, 600);
     return () => clearTimeout(handle);
-  }, [rooms, assets, blueprintImage, onPersist]);
+  }, [doc, blueprintImage, onPersist]);
 
   const handleBlueprintLoaded = (image: string | null, aspect: number) => {
     setBlueprintImage(image);
@@ -389,6 +450,9 @@ export default function App({
       return;
     }
 
+    // Capture the floor now: the user may switch floors while the AI is working,
+    // and the result must land on the floor it was requested for.
+    const targetLevelId = activeLevelId;
     setIsDigitizing(true);
     try {
       const data = geminiApiKey
@@ -398,9 +462,8 @@ export default function App({
       // Normalise the loosely-typed AI payload into strongly-typed state.
       const { rooms: mappedRooms, assets: mappedAssets } = mapApiLayout(data);
 
-      // Update states
-      setRooms(mappedRooms);
-      setAssets(mappedAssets);
+      // Replace only the target floor (undoable) — other floors are untouched.
+      update((d) => replaceLevelContent(d, targetLevelId, mappedRooms, mappedAssets));
 
       showToast(
         `Digital Twin layout of ${mappedRooms.length} rooms and ${mappedAssets.length} nodes synthesized successfully.`,
@@ -488,19 +551,21 @@ export default function App({
       rotationY: item.rotation || 0,
       scale: item.scale || { x: 1, y: 1, z: 1 },
       assignedRoomId: roomId,
+      levelId: activeLevelId,
       specs: item.specs || { Manufacturer: 'Standard BIM Family', Cost: '$150.00', Weight: '6 kg' },
     }));
 
-    setAssets((prev) => [...prev, ...newAssetsToAppend]);
+    update((d) => ({ ...d, assets: [...d.assets, ...newAssetsToAppend] }));
 
     showToast(`Nested ${newAssetsToAppend.length} preconfigured nodes into ${room.name}.`);
   };
 
   // Reset CAD workspace to default image specifications
   const handleResetCanvas = () => {
-    if (confirm('Are you sure you want to completely clear the canvas?')) {
-      setRooms([]);
-      setAssets([]);
+    if (confirm('Are you sure you want to completely clear the canvas (all floors)? You can undo this.')) {
+      // Back to a single empty floor, as an undoable step.
+      update((d) => normalizeDesign({ levels: [{ ...d.levels[0], name: 'Level 1', elevation: 0 }], rooms: [], assets: [] }));
+      setActiveLevelId(doc.levels[0].id);
       setBlueprintImage(null);
       setSelectedAssetId(null);
       if (!onPersist) clearDesign(); // local mode only; SaaS autosaves the empty design
@@ -513,8 +578,14 @@ export default function App({
       return;
     }
     if (confirm('Importing will overwrite current design. Proceed?')) {
-      if (json.rooms) setRooms(json.rooms);
-      if (json.assets) setAssets(json.assets);
+      // Older exports have no floors: normalizeDesign folds them into "Level 1".
+      const imported = normalizeDesign({
+        levels: Array.isArray(json.levels) ? json.levels : undefined,
+        rooms: Array.isArray(json.rooms) ? json.rooms : [],
+        assets: Array.isArray(json.assets) ? json.assets : [],
+      });
+      update(() => imported);
+      setActiveLevelId(imported.levels[0].id);
       if (json.blueprintImage) setBlueprintImage(json.blueprintImage);
       showToast('Design imported successfully.');
     }
@@ -527,6 +598,7 @@ export default function App({
       return;
     }
 
+    const targetLevelId = activeLevelId; // see handleDigitizeBlueprint
     setIsDigitizing(true);
     try {
       const data = geminiApiKey
@@ -541,8 +613,7 @@ export default function App({
         throw new Error('The AI returned an empty layout. Try a more descriptive prompt.');
       }
 
-      setRooms(mappedRooms);
-      setAssets(mappedAssets);
+      update((d) => replaceLevelContent(d, targetLevelId, mappedRooms, mappedAssets));
       showToast(`Generated ${mappedRooms.length} rooms and ${mappedAssets.length} assets from your prompt.`);
     } catch (err: any) {
       if (err.status === 402) {
@@ -554,6 +625,38 @@ export default function App({
     } finally {
       setIsDigitizing(false);
     }
+  };
+
+  // ---- Floors ----
+  const levelSummaries = useMemo(() => summarizeLevels(doc), [doc]);
+  const costByLevel = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const l of doc.levels) out[l.id] = computeBom(allAssets.filter((a) => a.levelId === l.id)).grandTotal;
+    return out;
+  }, [doc.levels, allAssets]);
+
+  const handleAddLevel = () => {
+    const res = addLevel(doc);
+    if (!res.levelId) { showToast('Maximum number of floors reached.', 'error'); return; }
+    update(() => res.design); // computed once outside the updater so the new id stays stable
+    setActiveLevelId(res.levelId);
+  };
+  const handleRenameLevel = (id: string, name: string) => update((d) => renameLevel(d, id, name));
+  const handleDuplicateLevel = (id: string) => {
+    const res = duplicateLevel(doc, id);
+    if (!res) { showToast('Could not duplicate this floor.', 'error'); return; }
+    update(() => res.design); // computed once outside the updater so ids stay stable
+    setActiveLevelId(res.levelId);
+    showToast('Floor duplicated. Use Undo to revert.');
+  };
+  const handleDeleteLevel = (id: string) => {
+    const lvl = doc.levels.find((l) => l.id === id);
+    const { rooms: r, assets: a } = entitiesForLevel(doc, id);
+    if ((r.length || a.length) && !confirm(`Delete "${lvl?.name}" with ${r.length} rooms and ${a.length} assets? You can undo this.`)) return;
+    const res = deleteLevel(doc, id);
+    if (!res) return;
+    update(() => res.design);
+    setActiveLevelId(res.nextActiveId);
   };
 
   // Active highlighted item lookup for sidebar coordination
@@ -581,7 +684,7 @@ export default function App({
 
   // Full JSON schematic backup.
   const handleExportJSON = () => {
-    const payload = { exportedAt: new Date().toISOString(), rooms, assets, blueprintImage };
+    const payload = { exportedAt: new Date().toISOString(), levels: doc.levels, rooms: allRooms, assets: allAssets, blueprintImage };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -595,7 +698,7 @@ export default function App({
   // Copy the design payload to the clipboard for pasting into other tools.
   const handleCopyJSON = async () => {
     try {
-      await navigator.clipboard.writeText(JSON.stringify({ rooms, assets }, null, 2));
+      await navigator.clipboard.writeText(JSON.stringify({ levels: doc.levels, rooms: allRooms, assets: allAssets }, null, 2));
       showToast('Design JSON copied to clipboard.');
     } catch {
       showToast('Clipboard access was blocked by the browser.', 'error');
@@ -607,26 +710,30 @@ export default function App({
   const handleExportPDF = async () => {
     let snapshot = captureRef.current?.();
     if (snapshot && watermarkExports) snapshot = await watermarkPng(snapshot, 'ArchViz Pro · Free');
-    const totalArea = rooms.reduce((sum, r) => sum + r.width * r.depth * 10.7639, 0);
-    const roomRows = rooms
+    // The report covers the WHOLE building (every floor); the snapshot is the active floor.
+    const levelName = (id?: string) => doc.levels.find((l) => l.id === id)?.name ?? '';
+    const totalArea = allRooms.reduce((sum, r) => sum + r.width * r.depth * 10.7639, 0);
+    // Names come from users / imports / AI and this HTML is written into a new
+    // same-origin window, so everything interpolated below is escaped.
+    const roomRows = allRooms
       .map((r) => {
-        const count = assets.filter((a) => a.assignedRoomId === r.id).length;
-        return `<tr><td>${r.name}</td><td>${Math.round(r.width * r.depth * 10.7639)} sqft</td><td>${count}</td></tr>`;
+        const count = allAssets.filter((a) => a.assignedRoomId === r.id).length;
+        return `<tr><td>${escapeHtml(levelName(r.levelId))}</td><td>${escapeHtml(r.name)}</td><td>${Math.round(r.width * r.depth * 10.7639)} sqft</td><td>${count}</td></tr>`;
       })
       .join('');
-    const assetRows = assets
+    const assetRows = allAssets
       .map((a) => {
-        const room = rooms.find((r) => r.id === a.assignedRoomId)?.name || 'Unassigned';
-        return `<tr><td>${a.name}</td><td>${a.type}</td><td>${a.category}</td><td>${room}</td><td>${a.position.x.toFixed(1)}, ${a.position.z.toFixed(1)}</td></tr>`;
+        const room = allRooms.find((r) => r.id === a.assignedRoomId)?.name || 'Unassigned';
+        return `<tr><td>${escapeHtml(levelName(a.levelId))}</td><td>${escapeHtml(a.name)}</td><td>${escapeHtml(a.type)}</td><td>${escapeHtml(a.category)}</td><td>${escapeHtml(room)}</td><td>${a.position.x.toFixed(1)}, ${a.position.z.toFixed(1)}</td></tr>`;
       })
       .join('');
 
     // Bill of materials for the report.
-    const bom = computeBom(assets);
+    const bom = computeBom(allAssets);
     const bomRows = bom.lines
       .map(
         (l) =>
-          `<tr><td>${l.item}${l.estimated ? ' <span style="color:#d97706">(est.)</span>' : ''}</td><td>${l.manufacturer}</td><td style="text-align:right">${l.quantity}</td><td style="text-align:right">${formatMoney(l.unitCost)}</td><td style="text-align:right">${formatMoney(l.lineTotal)}</td></tr>`
+          `<tr><td>${escapeHtml(l.item)}${l.estimated ? ' <span style="color:#d97706">(est.)</span>' : ''}</td><td>${escapeHtml(l.manufacturer)}</td><td style="text-align:right">${l.quantity}</td><td style="text-align:right">${formatMoney(l.unitCost)}</td><td style="text-align:right">${formatMoney(l.lineTotal)}</td></tr>`
       )
       .join('');
     const bomTable = bom.lines.length
@@ -660,17 +767,18 @@ export default function App({
       <h1>Office Digital Twin — Audit Report</h1>
       <div class="sub">Generated ${new Date().toLocaleString()}${watermarkExports ? ' · <span class="wm-foot">Free plan — upgrade to remove the watermark</span>' : ''}</div>
       <div class="stats">
-        <div><b>${rooms.length}</b>Rooms</div>
-        <div><b>${assets.length}</b>Assets</div>
+        <div><b>${doc.levels.length}</b>Floors</div>
+        <div><b>${allRooms.length}</b>Rooms</div>
+        <div><b>${allAssets.length}</b>Assets</div>
         <div><b>${Math.round(totalArea)}</b>Total sqft</div>
         <div><b>${formatMoney(bom.grandTotal)}</b>Est. value</div>
       </div>
-      ${snapshot ? `<img src="${snapshot}" alt="Floor plan snapshot" />` : ''}
+      ${snapshot ? `<img src="${snapshot}" alt="${escapeHtml(activeLevel.name)} snapshot" /><div class="sub">Snapshot: ${escapeHtml(activeLevel.name)}</div>` : ''}
       <h2>Room Summary</h2>
-      <table><thead><tr><th>Room</th><th>Area</th><th>Assets</th></tr></thead><tbody>${roomRows}</tbody></table>
+      <table><thead><tr><th>Floor</th><th>Room</th><th>Area</th><th>Assets</th></tr></thead><tbody>${roomRows}</tbody></table>
       ${bomTable}
       <h2>Asset Inventory</h2>
-      <table><thead><tr><th>Name</th><th>Type</th><th>Category</th><th>Room</th><th>X, Z (m)</th></tr></thead><tbody>${assetRows}</tbody></table>
+      <table><thead><tr><th>Floor</th><th>Name</th><th>Type</th><th>Category</th><th>Room</th><th>X, Z (m)</th></tr></thead><tbody>${assetRows}</tbody></table>
       </body></html>`);
     win.document.close();
     win.focus();
@@ -690,11 +798,36 @@ export default function App({
           {headerSlot ? (
             headerSlot
           ) : (
-            <span className="text-sm text-slate-500 font-medium hidden sm:inline">Project: HQ West Wing - Level 4</span>
+            <span className="text-sm text-slate-500 font-medium hidden sm:inline">Project: HQ West Wing - {activeLevel.name}</span>
           )}
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Undo / redo */}
+          <div className="flex items-center gap-1 mr-1" role="group" aria-label="History">
+            <button
+              type="button"
+              onClick={handleUndo}
+              disabled={!canUndo}
+              aria-label="Undo"
+              title="Undo (Ctrl/Cmd+Z)"
+              className="av-btn av-btn-secondary av-btn-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={handleRedo}
+              disabled={!canRedo}
+              aria-label="Redo"
+              title="Redo (Ctrl/Cmd+Shift+Z)"
+              className="av-btn av-btn-secondary av-btn-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Redo2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <span className="sr-only" role="status" aria-live="polite">{historyNotice}</span>
+
           {/* Quick 2D/3D View Selector */}
           <div className="flex bg-slate-100 p-1 rounded-lg mr-2" id="header-viewMode-selector">
             <button
@@ -833,6 +966,7 @@ export default function App({
             selectedAssetId={selectedAssetId}
             onSelectAsset={setSelectedAssetId}
             onUpdateAssetPosition={handleUpdateAssetPosition}
+            onDragEnd={endGesture}
             viewMode={viewMode}
             activeCategoryFilter={activeCategoryFilter}
             activeAssetTypeFilter={activeAssetTypeFilter}
@@ -847,6 +981,16 @@ export default function App({
             blueprintOffsetZ={blueprintOffsetZ}
             blueprintVisible={blueprintVisible}
             captureRef={captureRef}
+          />
+          <LevelBar
+            summaries={levelSummaries}
+            costByLevel={costByLevel}
+            activeLevelId={activeLevelId}
+            onSelect={setActiveLevelId}
+            onAdd={handleAddLevel}
+            onRename={handleRenameLevel}
+            onDuplicate={handleDuplicateLevel}
+            onDelete={handleDeleteLevel}
           />
         </div>
 

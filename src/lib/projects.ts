@@ -3,7 +3,7 @@
  * configured and the user is authenticated; RLS enforces tenant isolation.
  */
 import { supabase } from './supabase';
-import { PlacedAsset, RoomDefinition } from '../types';
+import { Level, PlacedAsset, RoomDefinition } from '../types';
 
 export interface Workspace {
   id: string;
@@ -18,6 +18,8 @@ export interface ProjectSummary {
 }
 
 export interface ProjectDesign {
+  /** Floors. Absent on projects saved before multi-floor (loaded as a single "Level 1"). */
+  levels?: Level[];
   rooms: RoomDefinition[];
   assets: PlacedAsset[];
   /** Legacy inline data URL (older projects / before object storage). */

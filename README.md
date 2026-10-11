@@ -69,6 +69,19 @@ uploaded blueprint image or a text prompt into a fully editable layout.
 - **Collision & boundary detection** — overlapping or out-of-room assets are
   highlighted with a red warning ring and beacon.
 
+### Multi-floor & Undo/Redo
+- **Floors** — a floor switcher on the viewport lets you add, rename, duplicate and
+  delete floors. Each floor has its own rooms and assets; the **Building** summary
+  shows rooms, assets, area and estimated value per floor and in total.
+  *Duplicate floor* copies a typical floor in one click. AI digitize / rebuild
+  replaces only the floor you are on. JSON export/import, the PDF report and cloud
+  save cover the whole building. Designs saved before floors existed open as "Level 1".
+- **Undo / Redo** — header buttons, `Ctrl/Cmd+Z` and `Ctrl/Cmd+Shift+Z` (or `Ctrl+Y`).
+  A drag or a burst of typing is one step; AI generation, imports, floor changes and
+  *Reset Workspace* are all undoable (100 steps, per session).
+- Inventory / Bill of Materials / heatmaps show the **active floor**; the Building
+  summary and PDF report give whole-building totals.
+
 ### Analytics Overlays
 - **Occupancy heatmap** — colour-codes rooms by asset density vs. capacity.
 - **Wi-Fi coverage heatmap** — grades each room by distance to the nearest AP.
@@ -360,8 +373,7 @@ port 3000 and provide the env vars as secrets.
 
 ## 🛣 Roadmap
 
-- Multi-floor / level support
-- Undo / redo history
+- 3D stacked-floors view and per-floor blueprint underlays
 - Real-time multi-user collaboration
 - Direct BIM / IFC and DWG import
 - Bill-of-materials cost estimation

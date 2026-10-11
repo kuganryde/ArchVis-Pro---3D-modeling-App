@@ -46,6 +46,8 @@ interface ThreeCanvasProps {
   selectedAssetId: string | null;
   onSelectAsset: (id: string | null) => void;
   onUpdateAssetPosition: (id: string, x: number, z: number) => void;
+  /** Fired once when a drag gesture ends, so the parent can close its undo group. */
+  onDragEnd?: () => void;
   viewMode: '2D' | '3D';
   activeCategoryFilter: 'all' | 'furniture' | 'infrastructure';
   activeAssetTypeFilter: string | 'all';
@@ -70,6 +72,7 @@ export default function ThreeCanvas({
   selectedAssetId,
   onSelectAsset,
   onUpdateAssetPosition,
+  onDragEnd,
   viewMode,
   activeCategoryFilter,
   activeAssetTypeFilter,
@@ -1299,6 +1302,7 @@ export default function ThreeCanvas({
   };
 
   const handlePointerUp = () => {
+    if (isDraggingRef.current) onDragEnd?.();
     isDraggingRef.current = false;
     draggedAssetIdRef.current = null;
     if (controlsRef.current) controlsRef.current.enabled = true; // resume rotations
