@@ -274,7 +274,10 @@ export default function ThreeCanvas({
       renderer.dispose();
       if (captureRef) captureRef.current = null;
     };
-  }, [rooms]);
+    // Build the renderer ONCE. It used to depend on [rooms], tearing down and
+    // recreating the WebGL renderer, camera and scene on every room change. The
+    // render loop reads live data through roomsRef / assetsRef instead.
+  }, []);
 
   // Handle camera changes based on ViewMode (2D vs 3D)
   useEffect(() => {

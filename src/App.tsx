@@ -103,7 +103,10 @@ export default function App({
   // Undo/redo can remove the active floor (e.g. undoing "add floor"): fall back safely.
   const activeLevel = doc.levels.find((l) => l.id === activeLevelIdState) ?? doc.levels[0];
   const activeLevelId = activeLevel.id;
-  const { rooms, assets } = useMemo(() => entitiesForLevel(doc, activeLevelId), [doc, activeLevelId]);
+  // Memoised on their OWN source arrays (not the whole doc): moving an asset must
+  // not give the canvas a new `rooms` array, or it would treat the floor plan as changed.
+  const rooms = useMemo(() => doc.rooms.filter((r) => r.levelId === activeLevelId), [doc.rooms, activeLevelId]);
+  const assets = useMemo(() => doc.assets.filter((a) => a.levelId === activeLevelId), [doc.assets, activeLevelId]);
   const [historyNotice, setHistoryNotice] = useState('');
 
   // Snapshot function registered by ThreeCanvas for PNG exports.
