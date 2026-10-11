@@ -15,6 +15,7 @@ import { admin, isAdminConfigured, getUserFromRequest, isWorkspaceMember } from 
 import { getGeminiClient, generateLayoutWithRetry, GeminiRequestError } from "./serverGemini";
 import { DIGITIZE_PROMPT, buildRebuildInstructions } from "./src/shared/geminiSpec";
 import { PlanId, aiCreditsForPlan } from "./src/shared/plans";
+import { validateDigitizeInput, validatePromptInput } from "./src/shared/validation";
 
 /** Hosted AI works only when the platform key + Supabase admin are configured. */
 export const isHostedAiConfigured = (): boolean =>
@@ -183,10 +184,11 @@ async function handle(
 export async function meteredDigitize(req: Request, res: Response) {
   const ctx = await authWorkspace(req, res);
   if (!ctx) return;
-  const { base64Data, mimeType } = req.body as { base64Data?: string; mimeType?: string };
-  if (!base64Data) return res.status(400).json({ error: "Missing base64Data of the blueprint." });
-  const key = cacheKey("digitize", `${mimeType || "image/png"}|${base64Data}`);
-  const imagePart = { inlineData: { data: base64Data, mimeType: mimeType || "image/png" } };
+  const input = validateDigitizeInput(req.body);
+  if (!input.ok) return res.status(400).json({ error: input.error });
+  const { base64Data, mimeType } = input.value;
+  const key = cacheKey("digitize", `${mimeType}|${base64Data}`);
+  const imagePart = { inlineData: { data: base64Data, mimeType } };
   return handle(res, ctx, "digitize", key, [imagePart, { text: DIGITIZE_PROMPT }]);
 }
 
@@ -198,8 +200,9 @@ export async function meteredDigitize(req: Request, res: Response) {
 export async function meteredRebuild(req: Request, res: Response) {
   const ctx = await authWorkspace(req, res);
   if (!ctx) return;
-  const { prompt } = req.body as { prompt?: string };
-  if (!prompt) return res.status(400).json({ error: "No prompt provided." });
+  const input = validatePromptInput(req.body);
+  if (!input.ok) return res.status(400).json({ error: input.error });
+  const { prompt } = input.value;
   const key = cacheKey("rebuild", prompt.trim().toLowerCase());
   return handle(res, ctx, "rebuild", key, [{ text: buildRebuildInstructions(prompt) }]);
 }

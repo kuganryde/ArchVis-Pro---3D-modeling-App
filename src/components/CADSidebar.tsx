@@ -25,6 +25,7 @@ import { isOverlapping, isAssetOutsideRooms } from '../utils/geometry';
 import { showToast } from '../utils/toast';
 import BomPanel from './BomPanel';
 
+import { csvRow } from '../utils/csv';
 interface CADSidebarProps {
   rooms: RoomDefinition[];
   assets: PlacedAsset[];
@@ -295,20 +296,22 @@ export default function CADSidebar({
 
   // Export report structure as CSV table
   const handleExportCSV = () => {
-    let csvContent = 'data:text/csv;charset=utf-8,';
-    csvContent += 'Asset ID,Asset Name,Type,Category,Location Room,Coordinate X,Coordinate Z,Specifications\r\n';
-    
-    assets.forEach(a => {
-      const roomName = rooms.find(r => r.id === a.assignedRoomId)?.name || 'Unassigned';
-      const specString = a.specs ? Object.entries(a.specs).map(([k,v]) => `${k}:${v}`).join('; ') : 'N/A';
-      csvContent += `"${a.id}","${a.name}","${a.type}","${a.category}","${roomName}","${a.position.x.toFixed(2)}","${a.position.z.toFixed(2)}","${specString}"\r\n`;
-    });
-
-    const encodedUri = encodeURI(csvContent);
+    // csvRow() escapes quotes and defuses spreadsheet formulas (CSV injection);
+    // a Blob URL avoids the data-URI truncation that a literal '#' caused.
+    const rows = [
+      'Asset ID,Asset Name,Type,Category,Location Room,Coordinate X,Coordinate Z,Specifications',
+      ...assets.map(a => {
+        const roomName = rooms.find(r => r.id === a.assignedRoomId)?.name || 'Unassigned';
+        const specString = a.specs ? Object.entries(a.specs).map(([k, v]) => `${k}:${v}`).join('; ') : 'N/A';
+        return csvRow([a.id, a.name, a.type, a.category, roomName, a.position.x.toFixed(2), a.position.z.toFixed(2), specString]);
+      }),
+    ];
+    const url = URL.createObjectURL(new Blob([rows.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a');
-    link.href = encodedUri;
+    link.href = url;
     link.download = `Office_LowCurrent_Inventory_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
+    URL.revokeObjectURL(url);
   };
 
   // Handle local dynamic additions

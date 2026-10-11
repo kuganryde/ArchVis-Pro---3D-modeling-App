@@ -244,6 +244,9 @@ start`) — a static-only deploy can't process payments.
 | `npm run build`  | Build the client (Vite) and bundle the server (esbuild). |
 | `npm run start`  | Run the production server from `dist/`.                  |
 | `npm run lint`   | Type-check the project with `tsc --noEmit`.              |
+| `npm test`       | Unit + server tests (Vitest). `npm run test:coverage` adds coverage. |
+| `npm run test:e2e` | Playwright smoke tests against the production build (`npm run build` first). Set `E2E_CHROMIUM_PATH` to use an existing Chromium. |
+| `npm run audit:prod` | Fail on high/critical vulnerabilities in production dependencies. |
 | `npm run clean`  | Remove build artifacts.                                  |
 
 ---

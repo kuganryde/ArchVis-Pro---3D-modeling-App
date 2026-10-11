@@ -5,6 +5,7 @@
  */
 import { PlacedAsset } from '../types';
 import { catalogFor } from '../data/assetCatalog';
+import { csvRow } from './csv';
 
 export interface BomLine {
   type: string;
@@ -100,17 +101,17 @@ export function bomToCsv(bom: Bom): string {
   rows.push('Item,Manufacturer,Category,Quantity,Unit Cost,Line Total,Priced From');
   for (const l of bom.lines) {
     rows.push(
-      [
-        `"${l.item}"`,
-        `"${l.manufacturer}"`,
+      csvRow([
+        l.item,
+        l.manufacturer,
         l.category,
         l.quantity,
         l.unitCost.toFixed(2),
         l.lineTotal.toFixed(2),
         l.estimated ? 'Catalogue (est.)' : 'Asset spec',
-      ].join(',')
+      ])
     );
   }
-  rows.push(`"GRAND TOTAL",,,${bom.itemCount},,${bom.grandTotal.toFixed(2)},`);
+  rows.push(csvRow(['GRAND TOTAL', '', '', bom.itemCount, '', bom.grandTotal.toFixed(2), '']));
   return rows.join('\r\n');
 }
