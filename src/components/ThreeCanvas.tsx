@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PlacedAsset, RoomDefinition } from '../types';
+import type { StackView } from '../utils/levels';
 import {
   getAssetSize,
   isOverlapping,
@@ -48,6 +49,13 @@ interface ThreeCanvasProps {
   onUpdateAssetPosition: (id: string, x: number, z: number) => void;
   /** Fired once when a drag gesture ends, so the parent can close its undo group. */
   onDragEnd?: () => void;
+  /**
+   * Stacked building view: when set, the other floors are drawn as translucent
+   * "ghost" floors at their real elevations and the active floor is lifted to its
+   * own. Clicking a ghost floor calls onSelectLevel. Null/undefined = single floor.
+   */
+  stack?: StackView | null;
+  onSelectLevel?: (levelId: string) => void;
   viewMode: '2D' | '3D';
   activeCategoryFilter: 'all' | 'furniture' | 'infrastructure';
   activeAssetTypeFilter: string | 'all';
@@ -73,6 +81,8 @@ export default function ThreeCanvas({
   onSelectAsset,
   onUpdateAssetPosition,
   onDragEnd,
+  stack = null,
+  onSelectLevel,
   viewMode,
   activeCategoryFilter,
   activeAssetTypeFilter,
@@ -111,6 +121,15 @@ export default function ThreeCanvas({
   // Room overlay projections
   const [projectedRooms, setProjectedRooms] = useState<Array<{ id: string; name: string; area: number; assetCount: number; loadPercentage: number; x: number; y: number; textColor: string }>>([]);
 
+  // Stacked-view bookkeeping
+  const [projectedLevels, setProjectedLevels] = useState<Array<{ id: string; name: string; x: number; y: number }>>([]);
+  const stackOffset = stack ? stack.levels.find((l) => l.id === stack.activeLevelId)?.baseElevation ?? 0 : 0;
+  const stackOffsetRef = useRef(stackOffset);
+  const ghostAnchorsRef = useRef<Array<{ id: string; name: string; pos: THREE.Vector3 }>>([]);
+  const ghostPickRef = useRef<THREE.Object3D[]>([]);
+  const ghostPressRef = useRef<{ levelId: string; x: number; y: number } | null>(null);
+  const hadLevelLabelsRef = useRef(false);
+
   const roomsRef = useRef(rooms);
   const assetsRef = useRef(assets);
   const showOccupancyHeatmapRef = useRef(showOccupancyHeatmap);
@@ -126,6 +145,10 @@ export default function ThreeCanvas({
   useEffect(() => {
     showOccupancyHeatmapRef.current = showOccupancyHeatmap;
   }, [showOccupancyHeatmap]);
+
+  useEffect(() => {
+    stackOffsetRef.current = stackOffset;
+  }, [stackOffset]);
 
   // Initialize ThreeJS Scene
   useEffect(() => {
@@ -213,7 +236,7 @@ export default function ThreeCanvas({
         const tempV = new THREE.Vector3();
         const rect = renderer.domElement.getBoundingClientRect();
         const list = roomsRef.current.map((r) => {
-          tempV.set(r.x, 0, r.z);
+          tempV.set(r.x, stackOffsetRef.current, r.z);
           tempV.project(camera);
           const x = (tempV.x * .5 + .5) * rect.width;
           const y = (-(tempV.y) * .5 + .5) * rect.height;
@@ -246,6 +269,26 @@ export default function ThreeCanvas({
           isFinite(item.y)
         );
         setProjectedRooms(list);
+
+        // Ghost-floor name tags (stacked view only; cleared once when it turns off).
+        const anchors = ghostAnchorsRef.current;
+        if (anchors.length > 0 || hadLevelLabelsRef.current) {
+          const labels = anchors
+            .map((a) => {
+              tempV.copy(a.pos).project(camera);
+              return {
+                id: a.id,
+                name: a.name,
+                // Keep the tag inside the viewport (≈120px wide) instead of clipping at the edge.
+                x: Math.max(8, Math.min((tempV.x * 0.5 + 0.5) * rect.width, rect.width - 130)),
+                y: (-tempV.y * 0.5 + 0.5) * rect.height,
+                ok: tempV.z <= 1 && Number.isFinite(tempV.x) && Number.isFinite(tempV.y),
+              };
+            })
+            .filter((l) => l.ok);
+          setProjectedLevels(labels);
+          hadLevelLabelsRef.current = anchors.length > 0;
+        }
       }
 
       renderer.render(scene, camera);
@@ -274,7 +317,10 @@ export default function ThreeCanvas({
       renderer.dispose();
       if (captureRef) captureRef.current = null;
     };
-  }, [rooms]);
+    // Build the renderer ONCE. It used to depend on [rooms], tearing down and
+    // recreating the WebGL renderer, camera and scene on every room change. The
+    // render loop reads live data through roomsRef / assetsRef instead.
+  }, []);
 
   // Handle camera changes based on ViewMode (2D vs 3D)
   useEffect(() => {
@@ -341,7 +387,7 @@ export default function ThreeCanvas({
         mesh.name = 'BLUEPRINT_UNDERLAY';
         mesh.rotation.x = -Math.PI / 2;
         // Position slightly above ground plate, below room boxes
-        mesh.position.set(blueprintOffsetX, -0.012, blueprintOffsetZ);
+        mesh.position.set(blueprintOffsetX, -0.012 + stackOffset, blueprintOffsetZ);
 
         scene.add(mesh);
       },
@@ -349,7 +395,7 @@ export default function ThreeCanvas({
         console.error('Error loading custom blueprint asset texture:', err);
       }
     );
-  }, [blueprintImage, blueprintVisible, blueprintOpacity, blueprintScale, blueprintAspect, blueprintOffsetX, blueprintOffsetZ]);
+  }, [blueprintImage, blueprintVisible, blueprintOpacity, blueprintScale, blueprintAspect, blueprintOffsetX, blueprintOffsetZ, stackOffset]);
 
   // Re-generate Room Boxes and extruded walls when Rooms state or ViewMode updates
   useEffect(() => {
@@ -365,6 +411,7 @@ export default function ThreeCanvas({
 
     const roomPlanGroup = new THREE.Group();
     roomPlanGroup.name = 'ROOM_PLAN_GROUP';
+    roomPlanGroup.position.y = stackOffset; // lifted to this floor's elevation in the stacked view
 
     rooms.forEach((room) => {
       const group = new THREE.Group();
@@ -440,7 +487,7 @@ export default function ThreeCanvas({
     });
 
     scene.add(roomPlanGroup);
-  }, [rooms, viewMode, assets, showOccupancyHeatmap, showWifiHeatmap]);
+  }, [rooms, viewMode, assets, showOccupancyHeatmap, showWifiHeatmap, stackOffset]);
 
   // Helper to construct architectural walls
   function createWallMesh(
@@ -505,6 +552,7 @@ export default function ThreeCanvas({
 
     const assetsGroup = new THREE.Group();
     assetsGroup.name = 'PLACED_ASSETS_GROUP';
+    assetsGroup.position.y = stackOffset;
 
     const meshMap = new Map<string, THREE.Object3D>();
 
@@ -637,6 +685,7 @@ export default function ThreeCanvas({
     if (showCablingPaths) {
       const cablingGroup = new THREE.Group();
       cablingGroup.name = 'CABLING_PATHS_GROUP';
+      cablingGroup.position.y = stackOffset;
 
       // Locate the network rack (MDF/IDF). Prefer a room that looks like a
       // server/comms room; otherwise fall back to the grid origin so cabling
@@ -698,7 +747,7 @@ export default function ThreeCanvas({
 
     scene.add(assetsGroup);
     assetMeshesRef.current = meshMap;
-  }, [assets, rooms, selectedAssetId, activeCategoryFilter, activeAssetTypeFilter, viewMode, showWifiHeatmap, showCablingPaths]);
+  }, [assets, rooms, selectedAssetId, activeCategoryFilter, activeAssetTypeFilter, viewMode, showWifiHeatmap, showCablingPaths, stackOffset]);
 
   // Generates procedurally crafted Three.js geometric items for outstanding interior and low-current fidelity
   function buildProceduralAssetMesh(asset: PlacedAsset, group: THREE.Group) {
@@ -1163,6 +1212,133 @@ export default function ThreeCanvas({
     }
   }
 
+  // Cheap content signature of the OTHER floors: the ghost meshes rebuild only when
+  // something visible on them changes, not on every edit to the active floor.
+  const ghostKey = stack
+    ? stack.levels
+        .filter((l) => l.id !== stack.activeLevelId && !(stack.cutAbove && l.baseElevation > stackOffset))
+        .map(
+          (l) =>
+            `${l.id}|${l.name}|${l.baseElevation}|` +
+            l.rooms.map((r) => `${r.id},${r.x},${r.z},${r.width},${r.depth},${r.color}`).join(';') +
+            '|' +
+            l.assets.map((a) => `${a.id},${a.position.x},${a.position.y},${a.position.z},${a.category}`).join(';')
+        )
+        .join('#')
+    : '';
+
+  // Stacked building view: draw every other floor as a light, translucent ghost.
+  useEffect(() => {
+    const scene = sceneRef.current;
+    ghostAnchorsRef.current = [];
+    ghostPickRef.current = [];
+    if (!scene || !stack || viewMode !== '3D') return;
+
+    const group = new THREE.Group();
+    group.name = 'GHOST_FLOORS_GROUP';
+    const disposables: Array<{ dispose: () => void }> = [];
+    const pickables: THREE.Object3D[] = [];
+    const anchors: Array<{ id: string; name: string; pos: THREE.Vector3 }> = [];
+    const infraColor = new THREE.Color('#06b6d4');
+    const furnColor = new THREE.Color('#94a3b8');
+    const dummy = new THREE.Object3D();
+
+    stack.levels.forEach((level) => {
+      if (level.id === stack.activeLevelId) return;
+      if (stack.cutAbove && level.baseElevation > stackOffset) return;
+
+      const floor = new THREE.Group();
+      floor.position.y = level.baseElevation;
+      floor.userData.levelId = level.id;
+
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      level.rooms.forEach((room) => {
+        const slabGeo = new THREE.BoxGeometry(room.width, 0.1, room.depth);
+        const slabMat = new THREE.MeshStandardMaterial({
+          color: new THREE.Color(room.color),
+          transparent: true,
+          opacity: 0.38,
+          roughness: 0.9,
+          depthWrite: false,
+        });
+        const slab = new THREE.Mesh(slabGeo, slabMat);
+        slab.position.set(room.x, 0.05, room.z);
+        slab.userData.levelId = level.id;
+        floor.add(slab);
+        pickables.push(slab);
+
+        // Wireframe walls: legible massing without hiding the floors behind.
+        const wallGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(room.width, 2.4, room.depth));
+        const wallMat = new THREE.LineBasicMaterial({ color: '#94a3b8', transparent: true, opacity: 0.55 });
+        const walls = new THREE.LineSegments(wallGeo, wallMat);
+        walls.position.set(room.x, 1.2, room.z);
+        floor.add(walls);
+        disposables.push(slabGeo, slabMat, wallGeo, wallMat);
+
+        minX = Math.min(minX, room.x - room.width / 2);
+        maxX = Math.max(maxX, room.x + room.width / 2);
+        minZ = Math.min(minZ, room.z - room.depth / 2);
+        maxZ = Math.max(maxZ, room.z + room.depth / 2);
+      });
+
+      // One instanced mesh per floor for all asset markers (cheap even for 1000s).
+      if (level.assets.length > 0) {
+        const markerGeo = new THREE.BoxGeometry(0.32, 0.32, 0.32);
+        const markerMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.6 });
+        const markers = new THREE.InstancedMesh(markerGeo, markerMat, level.assets.length);
+        level.assets.forEach((a, i) => {
+          dummy.position.set(a.position.x, Math.min(a.position.y, level.height - 0.2), a.position.z);
+          dummy.updateMatrix();
+          markers.setMatrixAt(i, dummy.matrix);
+          markers.setColorAt(i, a.category === 'infrastructure' ? infraColor : furnColor);
+        });
+        markers.instanceMatrix.needsUpdate = true;
+        if (markers.instanceColor) markers.instanceColor.needsUpdate = true;
+        markers.raycast = () => {}; // markers are decoration; only slabs are clickable
+        floor.add(markers);
+        disposables.push(markerGeo, markerMat, markers);
+      }
+
+      group.add(floor);
+      const hasRooms = Number.isFinite(minX);
+      anchors.push({
+        id: level.id,
+        name: level.name,
+        pos: new THREE.Vector3(hasRooms ? maxX + 1.2 : 0, level.baseElevation + 0.6, hasRooms ? (minZ + maxZ) / 2 : 0),
+      });
+    });
+
+    scene.add(group);
+    ghostAnchorsRef.current = anchors;
+    ghostPickRef.current = pickables;
+    return () => {
+      scene.remove(group);
+      disposables.forEach((d) => d.dispose());
+      ghostAnchorsRef.current = [];
+      ghostPickRef.current = [];
+    };
+  }, [ghostKey, viewMode, !!stack]);
+
+  // Frame the whole building when the stack turns on / its height changes, and go
+  // back to the normal camera when it turns off.
+  const stackHeight = stack ? Math.round(stack.totalHeight * 10) : 0;
+  useEffect(() => {
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!camera || !controls || viewMode !== '3D') return;
+    if (stack) {
+      const h = stack.totalHeight;
+      controls.maxDistance = 160;
+      controls.target.set(0, h / 2, 0);
+      camera.position.set(0, h / 2 + 18 + h * 0.7, 26 + h * 1.2);
+    } else {
+      controls.maxDistance = 60;
+      controls.target.set(0, 0, 0);
+      camera.position.set(0, 20, 24);
+    }
+    controls.update();
+  }, [!!stack, stackHeight, viewMode]);
+
   // Mouse interactivity triggers (Hovering, clicking, and dragging)
   const handlePointerDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!rendererRef.current || !cameraRef.current || !sceneRef.current) return;
@@ -1177,6 +1353,7 @@ export default function ThreeCanvas({
     // Casting rays to search for device models or furniture selections
     raycasterRef.current.setFromCamera(mouseRef.current, cameraRef.current);
 
+    ghostPressRef.current = null;
     const placedAssetsGroup = sceneRef.current.getObjectByName('PLACED_ASSETS_GROUP');
     if (!placedAssetsGroup) return;
 
@@ -1211,8 +1388,24 @@ export default function ThreeCanvas({
       }
     }
 
+    // A press on a ghost floor may become a floor switch on mouse-up — but only if
+    // the pointer did not move (otherwise it was an orbit gesture, not a click).
+    if (ghostPickRef.current.length > 0) {
+      const hit = raycasterRef.current.intersectObjects(ghostPickRef.current, false)[0];
+      if (hit?.object.userData.levelId) {
+        ghostPressRef.current = { levelId: hit.object.userData.levelId, x: e.clientX, y: e.clientY };
+      }
+    }
+
     // Checking if click landed outside any entities - deselect
     onSelectAsset(null);
+  };
+
+  const handleCanvasMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const press = ghostPressRef.current;
+    ghostPressRef.current = null;
+    handlePointerUp();
+    if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 5) onSelectLevel?.(press.levelId);
   };
 
   const handlePointerMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -1249,6 +1442,12 @@ export default function ThreeCanvas({
 
     // 2. Hover highlights tooltips
     raycasterRef.current.setFromCamera(mouseRef.current, cameraRef.current);
+
+    // Pointer cursor over a clickable ghost floor.
+    if (canvasRef.current) {
+      const overGhost = ghostPickRef.current.length > 0 && raycasterRef.current.intersectObjects(ghostPickRef.current, false).length > 0;
+      canvasRef.current.style.cursor = overGhost ? 'pointer' : '';
+    }
 
     // A. Check for asset hovering
     const assetsGroup = sceneRef.current.getObjectByName('PLACED_ASSETS_GROUP');
@@ -1316,8 +1515,8 @@ export default function ThreeCanvas({
         ref={canvasRef}
         onMouseDown={handlePointerDown}
         onMouseMove={handlePointerMove}
-        onMouseUp={handlePointerUp}
-        onMouseLeave={handlePointerUp}
+        onMouseUp={handleCanvasMouseUp}
+        onMouseLeave={() => { ghostPressRef.current = null; handlePointerUp(); }}
         id="cad-three-canvas"
       />
 
@@ -1360,6 +1559,21 @@ export default function ThreeCanvas({
           );
         })}
       </div>
+
+      {/* Stacked view: floor name tags beside each ghost floor */}
+      {projectedLevels.length > 0 && (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden" id="level-labels-canvas-overlay" aria-hidden="true">
+          {projectedLevels.map((l) => (
+            <span
+              key={l.id}
+              className="absolute -translate-y-1/2 text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-white/90 text-slate-600 border border-slate-200 shadow-xs select-none whitespace-nowrap"
+              style={{ left: `${l.x}px`, top: `${l.y}px` }}
+            >
+              {l.name}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Real-time floating inspector HUD */}
       {(hoveredAsset || hoveredRoom) && (
