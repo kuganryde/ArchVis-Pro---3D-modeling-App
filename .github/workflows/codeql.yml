@@ -13,6 +13,10 @@ permissions:
 jobs:
   analyze:
     name: SAST (CodeQL)
+    # Free on public repos. Private repos need GitHub Advanced Security (code scanning)
+    # enabled in Settings -> Code security; opt in by setting the repository variable
+    # ENABLE_CODE_SCANNING=true once it is on, otherwise the SARIF upload fails.
+    if: ${{ !github.event.repository.private || vars.ENABLE_CODE_SCANNING == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
