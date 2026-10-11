@@ -15,7 +15,9 @@ export interface Design {
   assets: PlacedAsset[];
 }
 
-export const DEFAULT_LEVEL_HEIGHT = 3.0; // metres, typical office floor-to-floor
+// Floor-to-floor (metres). 3.6 leaves room for ceiling-mounted devices (mounted at
+// 3.2 m) plus the slab above; the previous 3.0 put them inside the next floor.
+export const DEFAULT_LEVEL_HEIGHT = 3.6;
 export const MAX_LEVELS = 60;
 export const MAX_LEVEL_NAME = 60;
 
@@ -71,6 +73,17 @@ export function entitiesForLevel(design: Design, levelId: string) {
     rooms: design.rooms.filter((r) => r.levelId === levelId),
     assets: design.assets.filter((a) => a.levelId === levelId),
   };
+}
+
+/** `base`, or `base 2`, `base 3`… — the first variant no existing level already uses. */
+export function uniqueLevelName(base: string, levels: Level[]): string {
+  const taken = new Set(levels.map((l) => l.name.toLowerCase()));
+  if (!taken.has(base.toLowerCase())) return base;
+  for (let n = 2; n < 1000; n++) {
+    const candidate = base.endsWith(')') ? `${base.slice(0, -1)} ${n})` : `${base} ${n}`;
+    if (!taken.has(candidate.toLowerCase())) return candidate;
+  }
+  return base;
 }
 
 /** "Level 2", "Level 3"… — next unused sequential name. */
@@ -130,7 +143,7 @@ export function duplicateLevel(
 ): { design: Design; levelId: string } | null {
   const src = design.levels.find((l) => l.id === levelId);
   if (!src || design.levels.length >= MAX_LEVELS) return null;
-  const { design: withLevel, levelId: newId } = addLevel(design, `${src.name} (copy)`);
+  const { design: withLevel, levelId: newId } = addLevel(design, uniqueLevelName(`${src.name} (copy)`, design.levels));
   if (!newId) return null;
 
   const roomIdMap = new Map<string, string>();
@@ -196,4 +209,65 @@ export function summarizeLevels(design: Design): LevelSummary[] {
       areaSqFt: Math.round(rooms.reduce((s, r) => s + r.width * r.depth * 10.7639, 0)),
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// Stacked building view
+// ---------------------------------------------------------------------------
+
+/** One floor prepared for the stacked 3D view. */
+export interface StackLevelData {
+  id: string;
+  name: string;
+  /** Height of this floor's slab above ground in the stack (metres). */
+  baseElevation: number;
+  height: number;
+  rooms: RoomDefinition[];
+  assets: PlacedAsset[];
+}
+
+export interface StackView {
+  levels: StackLevelData[];
+  activeLevelId: string;
+  /** Hide floors above the active one so you can look down into it. */
+  cutAbove: boolean;
+  /** Total stack height in metres (for camera framing). */
+  totalHeight: number;
+}
+
+/**
+ * Display elevation of each floor: floors sorted by their stored elevation, then
+ * stacked by height with no gaps. Deleting a middle floor, or a hand-edited
+ * elevation, therefore never leaves a hole in the building.
+ */
+export function computeStackElevations(levels: Level[]): Map<string, number> {
+  const ordered = levels
+    .map((level, index) => ({ level, index }))
+    .sort((a, b) => a.level.elevation - b.level.elevation || a.index - b.index);
+  const out = new Map<string, number>();
+  let base = 0;
+  for (const { level } of ordered) {
+    out.set(level.id, base);
+    base += level.height;
+  }
+  return out;
+}
+
+/** Everything the canvas needs to draw the whole building around the active floor. */
+export function buildStackView(design: Design, activeLevelId: string, cutAbove: boolean): StackView {
+  const elevations = computeStackElevations(design.levels);
+  const levels = design.levels.map((level) => ({
+    id: level.id,
+    name: level.name,
+    baseElevation: elevations.get(level.id) ?? 0,
+    height: level.height,
+    rooms: design.rooms.filter((r) => r.levelId === level.id),
+    assets: design.assets.filter((a) => a.levelId === level.id),
+  }));
+  return {
+    levels,
+    activeLevelId,
+    cutAbove,
+    totalHeight: design.levels.reduce((sum, l) => sum + l.height, 0),
+  };
 }

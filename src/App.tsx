@@ -16,7 +16,7 @@ import LevelBar from './components/LevelBar';
 import { escapeHtml } from './utils/html';
 import {
   Design, normalizeDesign, entitiesForLevel, addLevel, renameLevel, deleteLevel,
-  duplicateLevel, replaceLevelContent, summarizeLevels,
+  duplicateLevel, replaceLevelContent, summarizeLevels, buildStackView,
 } from './utils/levels';
 import { showToast } from './utils/toast';
 import Logo, { Wordmark } from './components/Logo';
@@ -108,6 +108,9 @@ export default function App({
   const rooms = useMemo(() => doc.rooms.filter((r) => r.levelId === activeLevelId), [doc.rooms, activeLevelId]);
   const assets = useMemo(() => doc.assets.filter((a) => a.levelId === activeLevelId), [doc.assets, activeLevelId]);
   const [historyNotice, setHistoryNotice] = useState('');
+  // Stacked building view (3D only): other floors as ghosts at their elevations.
+  const [stacked, setStacked] = useState(false);
+  const [cutAbove, setCutAbove] = useState(false);
 
   // Snapshot function registered by ThreeCanvas for PNG exports.
   const captureRef = useRef<(() => string | null) | null>(null);
@@ -631,6 +634,12 @@ export default function App({
   };
 
   // ---- Floors ----
+  // The stack only makes sense in 3D with at least two floors.
+  const canStack = viewMode === '3D' && doc.levels.length > 1;
+  const stackView = useMemo(
+    () => (stacked && canStack ? buildStackView(doc, activeLevelId, cutAbove) : null),
+    [stacked, canStack, doc, activeLevelId, cutAbove]
+  );
   const levelSummaries = useMemo(() => summarizeLevels(doc), [doc]);
   const costByLevel = useMemo(() => {
     const out: Record<string, number> = {};
@@ -794,18 +803,18 @@ export default function App({
       
       {/* 1. Bento Header Navigation */}
       <nav className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 shadow-xs">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <Logo size={38} />
           <Wordmark className="text-lg" />
           <div className="h-6 w-px bg-slate-200 mx-4"></div>
           {headerSlot ? (
             headerSlot
           ) : (
-            <span className="text-sm text-slate-500 font-medium hidden sm:inline">Project: HQ West Wing - {activeLevel.name}</span>
+            <span className="text-sm text-slate-500 font-medium hidden sm:inline truncate max-w-[16rem] xl:max-w-[24rem]" title={`Project: HQ West Wing - ${activeLevel.name}`}>Project: HQ West Wing - {activeLevel.name}</span>
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
           {/* Undo / redo */}
           <div className="flex items-center gap-1 mr-1" role="group" aria-label="History">
             <button
@@ -970,6 +979,8 @@ export default function App({
             onSelectAsset={setSelectedAssetId}
             onUpdateAssetPosition={handleUpdateAssetPosition}
             onDragEnd={endGesture}
+            stack={stackView}
+            onSelectLevel={setActiveLevelId}
             viewMode={viewMode}
             activeCategoryFilter={activeCategoryFilter}
             activeAssetTypeFilter={activeAssetTypeFilter}
@@ -994,6 +1005,12 @@ export default function App({
             onRename={handleRenameLevel}
             onDuplicate={handleDuplicateLevel}
             onDelete={handleDeleteLevel}
+            stacked={stacked && canStack}
+            canStack={canStack}
+            stackHint={viewMode !== '3D' ? 'Switch to 3D View to see the stacked building' : 'Add a second floor to stack the building'}
+            onToggleStacked={() => setStacked((v) => !v)}
+            cutAbove={cutAbove}
+            onToggleCutAbove={() => setCutAbove((v) => !v)}
           />
         </div>
 

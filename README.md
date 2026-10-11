@@ -79,6 +79,11 @@ uploaded blueprint image or a text prompt into a fully editable layout.
 - **Undo / Redo** — header buttons, `Ctrl/Cmd+Z` and `Ctrl/Cmd+Shift+Z` (or `Ctrl+Y`).
   A drag or a burst of typing is one step; AI generation, imports, floor changes and
   *Reset Workspace* are all undoable (100 steps, per session).
+- **Stacked 3D view** — the **Stack** button (3D, two or more floors) draws the whole
+  building: other floors appear as translucent ghost floors at their real elevations
+  (slab, wireframe walls and device markers) while the active floor stays fully
+  editable. Click a ghost floor to switch to it; **Cut above** hides the floors above
+  so you can look down into the active one. Floors stack by height with no gaps.
 - Inventory / Bill of Materials / heatmaps show the **active floor**; the Building
   summary and PDF report give whole-building totals.
 
@@ -373,7 +378,7 @@ port 3000 and provide the env vars as secrets.
 
 ## 🛣 Roadmap
 
-- 3D stacked-floors view and per-floor blueprint underlays
+- Per-floor blueprint underlays
 - Real-time multi-user collaboration
 - Direct BIM / IFC and DWG import
 - Bill-of-materials cost estimation
