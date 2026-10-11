@@ -33,3 +33,6 @@ acknowledge reports within 3 business days.
 - The user's Gemini BYOK key lives in `sessionStorage` and is called directly from
   the browser; the CSP limits exfiltration but an XSS bug would still expose it.
 - GitHub Actions are pinned to major tags, not commit SHAs.
+- Dependency review and CodeQL result upload on a private repository require GitHub
+  Advanced Security. Dependency review is skipped there unless the repository variable
+  `ENABLE_DEPENDENCY_REVIEW=true` is set.

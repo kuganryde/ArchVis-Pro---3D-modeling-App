@@ -9,6 +9,10 @@ permissions:
 jobs:
   review:
     name: Block risky new dependencies
+    # Free on public repos. On private repos it needs GitHub Advanced Security, so it
+    # is opt-in there: set the repository variable ENABLE_DEPENDENCY_REVIEW=true.
+    # (`npm audit` in ci.yml and Dependabot cover production deps either way.)
+    if: ${{ !github.event.repository.private || vars.ENABLE_DEPENDENCY_REVIEW == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
