@@ -62,8 +62,11 @@ function box(
   radius = 0
 ): THREE.Mesh {
   const [w, h, d] = size;
-  const g = geo(`box|${w}|${h}|${d}|${radius}`, () =>
-    radius > 0 ? new RoundedBoxGeometry(w, h, d, 3, radius) : new THREE.BoxGeometry(w, h, d)
+  // Rounding costs ~25x the triangles of a plain box (300 vs 12 even at 2 segments) and is
+  // invisible on small parts, so only the larger faceplates and casings are rounded.
+  const rounded = radius > 0 && Math.min(w, h, d) >= 0.045;
+  const g = geo(`box|${w}|${h}|${d}|${rounded ? radius : 0}`, () =>
+    rounded ? new RoundedBoxGeometry(w, h, d, 2, radius) : new THREE.BoxGeometry(w, h, d)
   );
   const m = new THREE.Mesh(g, material);
   m.position.set(...pos);
