@@ -1132,7 +1132,7 @@ export default function ThreeCanvas({
       {/* Real-time floating inspector HUD */}
       {(hoveredAsset || hoveredRoom) && (
         <div
-          className="absolute bottom-5 left-5 pointer-events-none max-w-sm rounded-2xl p-4 bg-white/95 backdrop-blur-md shadow-lg border border-slate-200/80 animate-in fade-in slide-in-from-bottom-2 duration-200"
+          className="absolute bottom-4 right-4 pointer-events-none w-72 max-w-[40%] rounded-2xl p-4 bg-white/95 backdrop-blur-md shadow-lg border border-slate-200/80 animate-in fade-in slide-in-from-bottom-2 duration-200"
           id="hover-hud-inspector"
         >
           {hoveredAsset ? (
