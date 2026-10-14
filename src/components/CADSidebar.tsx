@@ -24,6 +24,7 @@ import { PlacedAsset, RoomDefinition } from '../types';
 import { isOverlapping, isAssetOutsideRooms } from '../utils/geometry';
 import { showToast } from '../utils/toast';
 import BomPanel from './BomPanel';
+import IsoThumb from './IsoThumb';
 
 import { csvRow } from '../utils/csv';
 interface CADSidebarProps {
@@ -533,7 +534,7 @@ export default function CADSidebar({
               {/* Instant Instantiate library catalog list */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Procedural CAD Library</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">CAD Asset Library</label>
                   <span className="text-[10px] text-slate-400 font-mono">Click to insert on grid</span>
                 </div>
                 
@@ -549,13 +550,7 @@ export default function CADSidebar({
                           className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50 hover:bg-slate-100/80 transition-all cursor-pointer shadow-xs group"
                         >
                           <div className="flex items-center gap-2.5">
-                            <div className={`p-2 rounded-lg ${
-                              item.category === 'infrastructure' 
-                                ? 'bg-cyan-50 text-cyan-600 group-hover:bg-cyan-100' 
-                                : 'bg-orange-50 text-orange-650 group-hover:bg-orange-100'
-                            } transition-all`}>
-                              {item.category === 'infrastructure' ? <Cpu className="w-4 h-4" /> : <Layout className="w-4 h-4" />}
-                            </div>
+                            <IsoThumb type={item.type} category={item.category as 'infrastructure' | 'furniture'} />
                             <div className="max-w-[180px] md:max-w-xs font-sans">
                               <span className="text-xs font-bold text-slate-800 group-hover:text-cyan-700 block">{item.label}</span>
                               <span className="text-[10.5px] text-slate-500 block leading-tight mt-0.5">{item.desc}</span>

@@ -87,6 +87,23 @@ uploaded blueprint image or a text prompt into a fully editable layout.
 - Inventory / Bill of Materials / heatmaps show the **active floor**; the Building
   summary and PDF report give whole-building totals.
 
+### 3D assets & isometric icons
+- **Real models for the furniture.** Chairs, tables, desk clusters, the reception counter,
+  cabinet and plant use CC0 models from the free [KayKit Furniture Bits](https://github.com/KayKit-Game-Assets/KayKit-Furniture-Bits-1.0)
+  pack (Kay Lousberg), fitted to each asset's footprint. They are committed unmodified,
+  hash-pinned in `public/models/kaykit/manifest.json`, and credited in
+  [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md). If a model ever fails to load the
+  editor falls back to the built-in procedural model.
+- **Original models for the hardware.** No accessible free library has network or AV
+  equipment, so the access point, CCTV, data / phone / HDMI / projector ports, door reader,
+  intercom and floor power box are hand-built (`src/three/deviceModels.ts`), keeping their
+  system colour-coding and footprints.
+- **Isometric icons.** Every Library card shows a true-isometric render (orthographic,
+  45° / 35.264°) of the same model the 3D view uses — see
+  [`docs/isometric-assets.png`](docs/isometric-assets.png). Regenerate them with
+  `npm run assets:iso` (add `-- --compare chair_office` to check a library model against
+  its stand-in side by side). `npm run models:verify` checks the model files against the manifest.
+
 ### Analytics Overlays
 - **Occupancy heatmap** — colour-codes rooms by asset density vs. capacity.
 - **Wi-Fi coverage heatmap** — grades each room by distance to the nearest AP.

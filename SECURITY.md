@@ -17,6 +17,7 @@ acknowledge reports within 3 business days.
 | Payments | Stripe webhook is signature-verified on the raw body | `billing.ts` |
 | Exports | CSV cells are escaped and spreadsheet formulas neutralised | `src/utils/csv.ts` |
 | Supply chain | Lockfile-pinned `npm ci --ignore-scripts`, `npm audit` gate, CycloneDX SBOM, dependency review, Dependabot | `.github/` |
+| 3D assets | Third-party models committed unmodified and pinned by SHA-256 (`public/models/kaykit/manifest.json`); tests verify hashes and that glTF files only reference plain sibling files (no remote / data / traversal URIs) | `tests/unit/models.test.ts` |
 | SAST | CodeQL (`security-extended`) on every PR and weekly | `.github/workflows/codeql.yml` |
 
 ## Deployment requirements

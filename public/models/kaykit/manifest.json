@@ -1,0 +1,85 @@
+{
+  "library": "KayKit : Furniture Bits (1.0)",
+  "author": "Kay Lousberg (www.kaylousberg.com)",
+  "license": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "source": "https://github.com/KayKit-Game-Assets/KayKit-Furniture-Bits-1.0",
+  "homepage": "https://kaylousberg.itch.io/furniture-bits",
+  "files": [
+    {
+      "name": "armchair_pillows.bin",
+      "bytes": 20420,
+      "sha256": "b40556981e1bd4593ccaf7a14593f32e20859c2f2e6022a0ed0d1a278a4194a0"
+    },
+    {
+      "name": "armchair_pillows.gltf",
+      "bytes": 3036,
+      "sha256": "1344db27a72870fb0a1b43ffcfe12f5f3dd3284f5dcecd10ed593d6e0d940f79"
+    },
+    {
+      "name": "cabinet_medium.bin",
+      "bytes": 23304,
+      "sha256": "3fc4bff757a36226ecb9504dd6e9d031a5a6c957cb9cc2bb636f12ab49e877e6"
+    },
+    {
+      "name": "cabinet_medium.gltf",
+      "bytes": 3000,
+      "sha256": "139419c479c6f8b38ac24e12ce85bf81a199e05067a544db879f7e403446c9dc"
+    },
+    {
+      "name": "cactus_medium_A.bin",
+      "bytes": 17536,
+      "sha256": "be9378a1328b82751ac651de9387d7b20db4ffbb5e1c087b0e634a00ebf7cc0f"
+    },
+    {
+      "name": "cactus_medium_A.gltf",
+      "bytes": 3072,
+      "sha256": "902c48a87bf8e48a2d72055485eaaeae3aefd91224e5af914aeb42fca99759a8"
+    },
+    {
+      "name": "chair_C.bin",
+      "bytes": 12608,
+      "sha256": "dbcd655953927997f2a4f61676692d053f4eb261b364fe5441276aa4614cfc9d"
+    },
+    {
+      "name": "chair_C.gltf",
+      "bytes": 3036,
+      "sha256": "fc042915c24c52f96f0571db348a2de275b15c0065c3e561fce37d4dbc81568a"
+    },
+    {
+      "name": "furniturebits_texture.png",
+      "bytes": 15605,
+      "sha256": "de62db37a80d1801c3d9eb674890ae04b04469e0c149481a51fa250562c628dc"
+    },
+    {
+      "name": "table_medium.bin",
+      "bytes": 9328,
+      "sha256": "0e6ba8fd006f673d946979e45487067f4e274be9bbd07816fd371578d2a37518"
+    },
+    {
+      "name": "table_medium.gltf",
+      "bytes": 2973,
+      "sha256": "fd5e5fe8bbf1d3729b6bd725165d58490e9cbd8dd46ce42314b01f20951a302b"
+    },
+    {
+      "name": "table_medium_long.bin",
+      "bytes": 9328,
+      "sha256": "b436c4b982a7defac5310f6ca17bf387f24c8c9b843e035c09d23094ace9b788"
+    },
+    {
+      "name": "table_medium_long.gltf",
+      "bytes": 2987,
+      "sha256": "e3ba8f08ce5964d602cde13ecba2b837f90b3ed22d092e28fa489f3c216e2488"
+    },
+    {
+      "name": "table_small.bin",
+      "bytes": 9328,
+      "sha256": "e18bad66ad227a4a374fd58fbe6870a73c0f3f3687cb363506e0d77e07964066"
+    },
+    {
+      "name": "table_small.gltf",
+      "bytes": 2979,
+      "sha256": "6ae46ef60d18cf1fe507fbb2fb20235144af2ac7101f410269a761ac91ae9aee"
+    }
+  ]
+}
