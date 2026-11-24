@@ -237,3 +237,67 @@ export function buildWhiteboardModel(group: THREE.Group): void {
     }
   }
 }
+
+/**
+ * Real-world sizes (metres) the office models below are built to. Kept next to the
+ * models so the bounding-box tests and the footprints in getAssetSize() can be
+ * checked against one set of numbers.
+ */
+export const OFFICE_MODEL_SIZES = {
+  desk_single: { x: 1.2, y: 0.75, z: 0.7 },
+  cabinet: { x: 1.0, y: 1.0, z: 0.5 },
+  whiteboard: { x: 0.5, y: 1.6, z: 1.24 },
+  projector: { x: 0.33, y: 0.457, z: 0.33 },
+  lcd_display: { x: 0.055, y: 0.82, z: 1.45 },
+  projector_screen: { x: 0.1, y: 1.34, z: 2.0 },
+} as const;
+
+/** Single office desk: 1.2 x 0.7 m top, 0.75 m high, four steel legs and a rear modesty panel. */
+export function buildDeskModel(group: THREE.Group): void {
+  const wood = mat('#b8793f', { roughness: 0.55 });
+  const steel = mat('#94a3b8', { metalness: 0.8, roughness: 0.25 });
+  box(group, [1.2, 0.03, 0.7], [0, 0.735, 0], wood, 0.008);
+  for (const x of [-0.55, 0.55]) for (const z of [-0.3, 0.3]) box(group, [0.05, 0.72, 0.05], [x, 0.36, z], steel);
+  box(group, [1.0, 0.3, 0.02], [0, 0.55, -0.3], mat('#8a5a2b', { roughness: 0.6 }));
+}
+
+/** Two-door steel storage cabinet: 1.0 m wide, 0.5 m deep, 1.0 m high, front toward +Z. */
+export function buildCabinetModel(group: THREE.Group): void {
+  const steel = mat('#cbd5e1', { metalness: 0.35, roughness: 0.45 });
+  const door = mat('#e2e8f0', { metalness: 0.3, roughness: 0.4 });
+  box(group, [0.96, 0.06, 0.44], [0, 0.03, -0.02], mat('#475569', { roughness: 0.6 }));
+  box(group, [1.0, 0.94, 0.46], [0, 0.53, -0.02], steel);
+  for (const x of [-0.245, 0.245]) {
+    box(group, [0.49, 0.88, 0.03], [x, 0.53, 0.225], door);
+    box(group, [0.016, 0.16, 0.01], [x < 0 ? -0.04 : 0.04, 0.53, 0.245], GOLD());
+  }
+}
+
+/** Ceiling projector on a drop pole. Origin is the underside of the body; the plate is 0.457 m above. */
+export function buildProjectorModel(group: THREE.Group): void {
+  const white = mat('#f1f5f9', { roughness: 0.4 });
+  box(group, [0.33, 0.1, 0.27], [0, 0.05, 0], white, 0.02);
+  const lens = new THREE.Mesh(geo('proj-lens', () => new THREE.CylinderGeometry(0.045, 0.05, 0.06, 20)), INK());
+  lens.rotation.x = Math.PI / 2;
+  lens.position.set(0.05, 0.05, 0.135 + 0.03 - 0.0);
+  group.add(lens);
+  box(group, [0.06, 0.012, 0.05], [-0.1, 0.1, -0.05], mat('#cbd5e1', { roughness: 0.6 })); // exhaust vent
+  const pole = new THREE.Mesh(geo('proj-pole', () => new THREE.CylinderGeometry(0.02, 0.02, 0.345, 12)), mat('#64748b', { metalness: 0.7, roughness: 0.3 }));
+  pole.position.set(0, 0.1 + 0.1725, 0);
+  group.add(pole);
+  box(group, [0.2, 0.012, 0.2], [0, 0.451, 0], mat('#64748b', { metalness: 0.7, roughness: 0.3 }));
+}
+
+/** 65-inch wall-mounted LCD panel: 1.45 x 0.82 m, thin along X, screen faces +X. Origin is the bottom edge. */
+export function buildLcdModel(group: THREE.Group): void {
+  box(group, [0.05, 0.82, 1.45], [0, 0.41, 0], mat('#111827', { roughness: 0.4, metalness: 0.4 }), 0.012);
+  box(group, [0.008, 0.78, 1.41], [0.026, 0.41, 0], mat('#0b1a33', { roughness: 0.1, metalness: 0.2, emissive: '#1d4ed8', emissiveIntensity: 0.25 }));
+}
+
+/** Electric drop-down projector screen: 1.9 x 1.2 m viewing area, 2.0 m case, faces +X. Origin is the bottom edge. */
+export function buildScreenModel(group: THREE.Group): void {
+  const dark = mat('#1e293b', { roughness: 0.5 });
+  box(group, [0.03, 0.04, 1.9], [0, 0.02, 0], dark);
+  box(group, [0.01, 1.2, 1.9], [0, 0.64, 0], mat('#f8fafc', { roughness: 0.9 }));
+  box(group, [0.1, 0.1, 2.0], [0, 1.29, 0], mat('#e2e8f0', { roughness: 0.4, metalness: 0.3 }), 0.02);
+}

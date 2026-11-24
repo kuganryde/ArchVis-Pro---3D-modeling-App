@@ -24,6 +24,9 @@ export const ASSET_CATALOG: Partial<Record<AssetType, CatalogEntry>> = {
   hdmi_port: { label: 'HDMI Port', manufacturer: 'Generic', model: 'HDMI 2.1 Plate', unitCost: 60 },
   projector_port: { label: 'Projector Port', manufacturer: 'Generic', model: 'VGA/Serial Plate', unitCost: 90 },
 
+  projector: { label: 'Ceiling Projector', manufacturer: 'Generic', model: 'WUXGA 4000 lm', unitCost: 900 },
+  lcd_display: { label: 'LCD Display 65"', manufacturer: 'Generic', model: '65" 4K Commercial', unitCost: 1200 },
+
   // Furniture
   desk_single: { label: 'Single Desk', manufacturer: 'Standard BIM', model: 'Oak 1.2m', unitCost: 320 },
   desk_cluster_4: { label: '4-Pax Desk Cluster', manufacturer: 'Standard BIM', model: 'Modular-4', unitCost: 1200 },
@@ -34,6 +37,7 @@ export const ASSET_CATALOG: Partial<Record<AssetType, CatalogEntry>> = {
   reception_desk: { label: 'Reception Counter', manufacturer: 'Standard BIM', model: 'Marble', unitCost: 2200 },
   cabinet: { label: 'Storage Cabinet', manufacturer: 'Standard BIM', model: 'Steel', unitCost: 260 },
   whiteboard: { label: 'Interactive Whiteboard', manufacturer: 'Standard BIM', model: '86" 4K', unitCost: 900 },
+  projector_screen: { label: 'Projector Screen', manufacturer: 'Generic', model: '1.9 m Electric Drop', unitCost: 350 },
 
   // Architectural (usually excluded from procurement; priced at 0)
   wall_straight: { label: 'Wall Partition', manufacturer: '—', model: '—', unitCost: 0 },

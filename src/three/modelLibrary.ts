@@ -34,17 +34,15 @@ export const MODEL_SPECS: Partial<Record<AssetType, ModelSpec>> = {
   // Stretched to a real 0.9 m square footprint: the library armchair is far wider than deep-in-height,
   // so fitting it by height alone drew it ~1.2 m wide, twice the footprint used for collisions.
   chair_lounge: { file: 'armchair_pillows.gltf', fit: 'stretch', height: 0.85, yaw: Math.PI / 2 },
-  desk_single: { file: 'table_small.gltf', fit: 'stretch', height: 0.75 },
   desk_cluster_4: { file: 'table_medium.gltf', fit: 'stretch', height: 0.75 },
   desk_cluster_6: { file: 'table_medium_long.gltf', fit: 'stretch', height: 0.75 },
   conference_table: { file: 'table_medium_long.gltf', fit: 'stretch', height: 0.75 },
   reception_desk: { file: 'cabinet_medium.gltf', fit: 'stretch', height: 1.1 },
-  // These two exist in the type catalogue but used to render as a grey placeholder cube.
-  cabinet: { file: 'cabinet_medium.gltf', fit: 'stretch', height: 1.0 },
   // Stretched to the 0.6 m footprint: fitting by height alone drew it ~0.85 m wide, 42% over the footprint.
   plant_pot: { file: 'cactus_medium_A.gltf', fit: 'stretch', height: 0.8 },
-  // Not listed (kept procedural): wall/ceiling devices (AP, CCTV, ports, intercom, door
-  // reader) — no accessible free library offers network/AV hardware — and the whiteboard.
+  // Not listed (hand-built, see deviceModels.ts): wall/ceiling devices (AP, CCTV, ports, intercom,
+  // door reader, projector, LCD, screen), the whiteboard, and the desk and cabinet. The library's
+  // table_small and cabinet_medium are blocky shapes that distort badly at real office sizes.
 };
 
 export const MODEL_BASE_PATH = 'models/kaykit/';

@@ -6,7 +6,10 @@
  */
 import * as THREE from 'three';
 import { PlacedAsset } from '../types';
-import { buildDeviceModel, buildWhiteboardModel } from './deviceModels';
+import {
+  buildCabinetModel, buildDeskModel, buildDeviceModel, buildLcdModel, buildProjectorModel,
+  buildScreenModel, buildWhiteboardModel,
+} from './deviceModels';
 
 export interface ProceduralOptions {
   /** Highlight colours for the selected asset. */
@@ -22,6 +25,29 @@ export interface ProceduralOptions {
 
 /** Add the procedural meshes for `asset` to `group` (group origin = asset origin). */
 export function buildProceduralAssetMesh(
+  asset: PlacedAsset,
+  group: THREE.Group,
+  opts: ProceduralOptions
+): void {
+  // Furniture is modelled resting on y = 0, but the asset group sits at asset.position.y (0.4
+  // by default). Offset it back so it stands on the floor, as library models already do.
+  if (FLOOR_STANDING.has(asset.type)) {
+    const inner = new THREE.Group();
+    inner.position.y = -asset.position.y;
+    group.add(inner);
+    buildMesh(asset, inner, opts);
+    return;
+  }
+  buildMesh(asset, group, opts);
+}
+
+/** Furniture types that stand on the floor. */
+const FLOOR_STANDING = new Set<PlacedAsset['type']>([
+  'desk_single', 'desk_cluster_4', 'desk_cluster_6', 'conference_table', 'chair_office',
+  'chair_lounge', 'reception_desk', 'cabinet', 'whiteboard', 'plant_pot',
+]);
+
+function buildMesh(
   asset: PlacedAsset,
   group: THREE.Group,
   { isSelected, viewMode, showCoverage = true }: ProceduralOptions
@@ -166,35 +192,9 @@ export function buildProceduralAssetMesh(
     // -----------------------------------------
     // INTERIOR WORKSPACE (Furniture)
     // -----------------------------------------
-    case 'desk_single': {
-      // Table top wood panel
-      const topGeo = new THREE.BoxGeometry(1.2, 0.05, 0.7);
-      const topMat = new THREE.MeshStandardMaterial({ color: '#ea580c', roughness: 0.5 }); // warm cedar
-      const top = new THREE.Mesh(topGeo, topMat);
-      top.position.y = 0.725;
-      top.castShadow = true;
-      top.receiveShadow = true;
-      group.add(top);
-
-      // Thin metallic legs representation
-      const legGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.7, 8);
-      const legMat = new THREE.MeshStandardMaterial({ color: '#94a3b8', metalness: 0.9, roughness: 0.15 });
-
-      const offsets = [
-        { x: -0.55, z: -0.3 },
-        { x: 0.55, z: -0.3 },
-        { x: -0.55, z: 0.3 },
-        { x: 0.55, z: 0.3 },
-      ];
-
-      offsets.forEach((offset) => {
-        const leg = new THREE.Mesh(legGeo, legMat);
-        leg.position.set(offset.x, 0.35, offset.z);
-        leg.castShadow = true;
-        group.add(leg);
-      });
+    case 'desk_single':
+      buildDeskModel(group);
       break;
-    }
 
     case 'desk_cluster_4':
     case 'desk_cluster_6': {
@@ -333,6 +333,22 @@ export function buildProceduralAssetMesh(
 
     case 'whiteboard':
       buildWhiteboardModel(group);
+      break;
+
+    case 'cabinet':
+      buildCabinetModel(group);
+      break;
+
+    case 'projector':
+      buildProjectorModel(group);
+      break;
+
+    case 'lcd_display':
+      buildLcdModel(group);
+      break;
+
+    case 'projector_screen':
+      buildScreenModel(group);
       break;
 
     default: {

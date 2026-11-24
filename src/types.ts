@@ -17,6 +17,8 @@ export type AssetType =
   | 'power_outlet' // New Power Outlet Markings (Blue)
   | 'hdmi_port'    // HDMI Port
   | 'projector_port' // Projector Interface Port
+  | 'projector'    // Ceiling-mounted projector
+  | 'lcd_display'  // Wall-mounted LCD / flat-panel display
   // Furniture
   | 'desk_single'
   | 'desk_cluster_4'
@@ -27,6 +29,7 @@ export type AssetType =
   | 'reception_desk'
   | 'cabinet'
   | 'whiteboard'
+  | 'projector_screen' // Wall / ceiling pull-down projection screen
   // Architectural
   | 'wall_straight'
   | 'glass_divider'
@@ -34,7 +37,7 @@ export type AssetType =
   | 'plant_pot';
 
 export function getAssetHeightLayer(type: AssetType): 'ground' | 'ceiling' | 'port' {
-  if (type === 'ap' || type === 'cctv') {
+  if (type === 'ap' || type === 'cctv' || type === 'projector') {
     return 'ceiling';
   }
   if (
@@ -43,6 +46,8 @@ export function getAssetHeightLayer(type: AssetType): 'ground' | 'ceiling' | 'po
     type === 'power_outlet' ||
     type === 'hdmi_port' ||
     type === 'projector_port' ||
+    type === 'lcd_display' ||
+    type === 'projector_screen' ||
     type === 'door_access' ||
     type === 'intercom'
   ) {

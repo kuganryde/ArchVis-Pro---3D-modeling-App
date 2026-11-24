@@ -232,6 +232,8 @@ export default function CADSidebar({
     { type: 'power_outlet', category: 'infrastructure', label: 'Power Point / Outlet', count: 7, desc: 'UPS-backed high voltage blue power socket.' },
     { type: 'hdmi_port', category: 'infrastructure', label: 'HDMI Interface Port', count: 4, desc: 'High-speed multimedia gold-plated display wallplate/table connection.' },
     { type: 'projector_port', category: 'infrastructure', label: 'Projector Port (VGA/Ctrl)', count: 2, desc: 'Control signal and audio-video projector interface connector.' },
+    { type: 'projector', category: 'infrastructure', label: 'Ceiling Projector', desc: 'Ceiling-mounted projector on a drop pole, 0.33 m wide.' },
+    { type: 'lcd_display', category: 'infrastructure', label: 'LCD Display 65"', desc: 'Wall-mounted 65-inch commercial flat panel, 1.45 m wide.' },
     { type: 'cctv', category: 'infrastructure', label: 'CCTV Camera', count: 6, desc: 'High Definition dome with transparent active feed view.' },
     { type: 'door_access', category: 'infrastructure', label: 'Door Access System', count: 3, desc: 'RFID biometrics scan controller secure key.' },
     { type: 'intercom', category: 'infrastructure', label: 'Intercom Station', count: 1, desc: 'Lobby VoIP intercom with display and call capability.' },
@@ -244,6 +246,7 @@ export default function CADSidebar({
     { type: 'chair_lounge', category: 'furniture', label: 'Orange Lounge Armchair', desc: 'Lounge reception armchair in soft textured orange.' },
     { type: 'reception_desk', category: 'furniture', label: 'Reception Counter', desc: 'Circular design blue front marble countertop.' },
     { type: 'whiteboard', category: 'furniture', label: 'Whiteboard Stand', desc: 'Dual stand physical marker writing board.' },
+    { type: 'projector_screen', category: 'furniture', label: 'Projector Screen', desc: 'Wall or ceiling pull-down screen, 1.9 m viewing width.' },
   ];
 
   // Calculations for dashboard

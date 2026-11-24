@@ -4,8 +4,9 @@ import path from 'node:path';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MODEL_SPECS, computeModelFit } from '../../src/three/modelLibrary';
-import { buildDeviceModel, buildWhiteboardModel, DEVICE_TYPES } from '../../src/three/deviceModels';
-import { getAssetSize } from '../../src/utils/geometry';
+import { buildDeviceModel, buildWhiteboardModel, DEVICE_TYPES, OFFICE_MODEL_SIZES } from '../../src/three/deviceModels';
+import { buildProceduralAssetMesh } from '../../src/three/proceduralAssets';
+import { getAssetSize, getDefaultHeight } from '../../src/utils/geometry';
 import type { PlacedAsset } from '../../src/types';
 
 const MODELS_DIR = path.resolve('public/models/kaykit');
@@ -77,12 +78,7 @@ const SCALED_FOOTPRINT: Partial<Record<PlacedAsset['type'], { x: number; z: numb
 const MAX_OVERHANG: Partial<Record<PlacedAsset['type'], number>> = {};
 const DEFAULT_OVERHANG = 1.05;
 
-/** Same idea for stretched models: the library table_small and cabinet are blocky, so filling a real footprint distorts them. */
-const MAX_DISTORTION: Partial<Record<PlacedAsset['type'], number>> = {
-  desk_single: 1.75,
-  cabinet: 2.05,
-};
-const DEFAULT_DISTORTION = 1.6;
+const MAX_DISTORTION = 1.6;
 
 /** Largest ratio between the three axis scales; 1 means the model is not distorted. */
 const distortion = (s: { x: number; y: number; z: number }) => {
@@ -110,7 +106,7 @@ describe('library model bounding boxes', () => {
       expect(w / fp.width, `${type} width`).toBeCloseTo(1, 2);
       expect(d / fp.depth, `${type} depth`).toBeCloseTo(1, 2);
       // A stretched model must not look like a different object once it fills the footprint.
-      expect(distortion(s), `${type} distortion`).toBeLessThanOrEqual(MAX_DISTORTION[t] ?? DEFAULT_DISTORTION);
+      expect(distortion(s), `${type} distortion`).toBeLessThanOrEqual(MAX_DISTORTION);
     } else {
       const limit = MAX_OVERHANG[t] ?? DEFAULT_OVERHANG;
       expect(Math.max(w / fp.width, d / fp.depth), `${type} overhang`).toBeLessThanOrEqual(limit);
@@ -143,5 +139,59 @@ describe('hand-built device bounding boxes', () => {
     expect(size.y).toBeLessThan(1.7);
     expect(size.z).toBeGreaterThan(1.1);
     expect(size.z).toBeLessThan(1.4);
+  });
+});
+
+describe('hand-built office model bounding boxes', () => {
+  const TYPES = Object.keys(OFFICE_MODEL_SIZES) as Array<keyof typeof OFFICE_MODEL_SIZES>;
+
+  /** World-space bounds of an asset placed the way the editor places it (group at position.y). */
+  const placed = (type: PlacedAsset['type']) => {
+    const a = asset(type, { category: 'infrastructure', position: { x: 0, y: getDefaultHeight(type), z: 0 } });
+    const world = new THREE.Group();
+    const g = new THREE.Group();
+    buildProceduralAssetMesh(a, g, { isSelected: false, viewMode: '3D', showCoverage: false });
+    g.position.set(0, a.position.y, 0);
+    world.add(g);
+    world.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(world);
+    return { a, box, size: box.getSize(new THREE.Vector3()) };
+  };
+
+  it.each(TYPES)('%s is built to its real-world size', (type) => {
+    const { size } = placed(type);
+    const want = OFFICE_MODEL_SIZES[type];
+    expect(size.x, `${type} x`).toBeCloseTo(want.x, 2);
+    expect(size.y, `${type} y`).toBeCloseTo(want.y, 2);
+    expect(size.z, `${type} z`).toBeCloseTo(want.z, 2);
+  });
+
+  it.each(TYPES)('%s fits inside its footprint', (type) => {
+    const { a, size } = placed(type);
+    const fp = getAssetSize(a);
+    expect(size.x, `${type} x`).toBeLessThanOrEqual(fp.width * 1.05);
+    expect(size.z, `${type} z`).toBeLessThanOrEqual(fp.depth * 1.05);
+    // and is not much smaller, which would make collisions and occupancy too cautious
+    expect(size.x, `${type} x fill`).toBeGreaterThanOrEqual(fp.width * 0.5);
+    expect(size.z, `${type} z fill`).toBeGreaterThanOrEqual(fp.depth * 0.65);
+  });
+
+  it.each(['desk_single', 'cabinet', 'whiteboard'] as const)('%s stands on the floor, not 0.4 m above it', (type) => {
+    const { box } = placed(type);
+    expect(box.min.y).toBeCloseTo(0, 3);
+  });
+
+  it('ceiling projector hangs below a 3.2 m ceiling and its mount plate reaches it', () => {
+    const { box } = placed('projector');
+    expect(box.max.y).toBeCloseTo(3.2, 1);
+  });
+
+  it('wall display and screen sit at sensible heights', () => {
+    const lcd = placed('lcd_display').box;
+    expect((lcd.min.y + lcd.max.y) / 2).toBeGreaterThan(1.3); // centre near eye height
+    expect(lcd.max.y).toBeLessThan(2.2);
+    const screen = placed('projector_screen').box;
+    expect(screen.max.y).toBeLessThan(3.2);
+    expect(screen.min.y).toBeGreaterThan(0.9);
   });
 });

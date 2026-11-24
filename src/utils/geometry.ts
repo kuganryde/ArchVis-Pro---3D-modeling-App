@@ -18,6 +18,8 @@ export const INFRASTRUCTURE_TYPES: AssetType[] = [
   'power_outlet',
   'hdmi_port',
   'projector_port',
+  'projector',
+  'lcd_display',
 ];
 
 /** True when the given type is a low-current infrastructure device. */
@@ -28,6 +30,9 @@ export function isInfrastructureType(type: string): boolean {
 /** Standard mounting height (metres) for a given asset type. */
 export function getDefaultHeight(type: string): number {
   if (type === 'ap' || type === 'cctv') return 3.2; // ceiling mounted
+  if (type === 'projector') return 2.74; // body hangs on a 0.35 m drop pole below a 3.2 m ceiling
+  if (type === 'lcd_display') return 1.1; // bottom edge; a 65" panel is centred at about 1.5 m
+  if (type === 'projector_screen') return 1.3; // bottom edge of the screen when fully dropped
   if (isInfrastructureType(type)) return 0.8; // wall / port height
   return 0.4; // ground furniture
 }
@@ -67,7 +72,15 @@ export function getAssetSize(asset: PlacedAsset): { width: number; depth: number
     case 'reception_desk':
       return { width: 2.4, depth: 1.2 };
     case 'whiteboard':
-      return { width: 0.2, depth: 1.2 };
+      // Mobile board: 0.5 m deep T-feet, 1.24 m wide frame.
+      return { width: 0.5, depth: 1.25 };
+    case 'projector':
+      return { width: 0.35, depth: 0.35 };
+    case 'lcd_display':
+      // 65" commercial panel, 1.45 x 0.82 m; thin along X, front faces +X.
+      return { width: 0.1, depth: 1.45 };
+    case 'projector_screen':
+      return { width: 0.1, depth: 2.0 };
     case 'cabinet':
       return { width: 1.0, depth: 0.5 };
     case 'plant_pot':

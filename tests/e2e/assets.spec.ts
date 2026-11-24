@@ -1,9 +1,9 @@
 import { test, expect, Page } from '@playwright/test';
 
 const LIBRARY_TYPES = [
-  'ap', 'dp', 'tp', 'power_outlet', 'hdmi_port', 'projector_port', 'cctv', 'door_access', 'intercom',
+  'ap', 'dp', 'tp', 'power_outlet', 'hdmi_port', 'projector_port', 'projector', 'lcd_display', 'cctv', 'door_access', 'intercom',
   'desk_single', 'desk_cluster_4', 'desk_cluster_6', 'conference_table', 'chair_office', 'chair_lounge',
-  'reception_desk', 'whiteboard',
+  'reception_desk', 'whiteboard', 'projector_screen',
 ];
 
 const launch = async (page: Page) => {

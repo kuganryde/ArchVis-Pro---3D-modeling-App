@@ -269,6 +269,23 @@ export default function App({
           Location: 'Wall Faceplate'
         };
         break;
+      case 'projector':
+        label = `Ceiling Projector ${nextAssetIdNumberRef.current - 90}`;
+        defaultSpecs = {
+          Brightness: '4000 lumens',
+          Resolution: 'WUXGA',
+          Mounting: 'Ceiling drop pole',
+          Connection: 'HDMI / RJ45'
+        };
+        break;
+      case 'lcd_display':
+        label = `LCD Display ${nextAssetIdNumberRef.current - 90}`;
+        defaultSpecs = {
+          Size: '65-inch 4K',
+          Mounting: 'Wall bracket',
+          Connection: 'HDMI / RJ45'
+        };
+        break;
       case 'cctv':
         label = `New CCTV Camera ${nextAssetIdNumberRef.current - 90}`;
         defaultSpecs = {
@@ -326,6 +343,10 @@ export default function App({
         break;
       case 'whiteboard':
         label = `Interactive Dry-Erase Whiteboard`;
+        break;
+      case 'projector_screen':
+        label = `Projector Screen`;
+        defaultSpecs = { Size: '1.9 m wide', Drive: 'Electric drop', Mounting: 'Wall / ceiling' };
         break;
       default:
         label = `Generic Workspace Item`;
