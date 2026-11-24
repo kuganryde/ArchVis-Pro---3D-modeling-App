@@ -24,8 +24,13 @@ import LegalModal from './components/LegalModal';
 import { computeBom, formatMoney } from './utils/bom';
 import { watermarkPng } from './utils/watermark';
 import { PlanId, allowsCleanExports } from './shared/plans';
-import { digitizeBlueprintClient, rebuildFromPromptClient } from './utils/gemini';
-import { digitizeBlueprintHosted, rebuildFromPromptHosted } from './lib/aiHosted';
+import { digitizeBlueprintClient, rebuildFromPromptClient, houseBriefClient } from './utils/gemini';
+import { digitizeBlueprintHosted, rebuildFromPromptHosted, houseBriefHosted } from './lib/aiHosted';
+import HouseDesigner from './components/HouseDesigner';
+import { sanitizeAiBrief } from './shared/houseSpec';
+import { HOUSE_ASSET_SPECS, isHouseAssetType } from './house/assetSpecs';
+import { LIGHTING_PRESETS, type LightingMode } from './house/lighting';
+import type { GeneratedHouse } from './house/types';
 import {
   RefreshCw,
   HelpCircle,
@@ -44,7 +49,8 @@ import {
   Copy,
   Download,
   Undo2,
-  Redo2
+  Redo2,
+  Home as HomeIcon
 } from 'lucide-react';
 
 // Google Analytics measurement ID, configured via the VITE_GA_MEASUREMENT_ID
@@ -143,6 +149,10 @@ export default function App({
   const [geminiApiKey, setGeminiApiKey] = useState<string>('');
   const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
   const [showShareModal, setShowShareModal] = useState<boolean>(false);
+  const [showHouseDesigner, setShowHouseDesigner] = useState<boolean>(false);
+  const [lightingMode, setLightingMode] = useState<LightingMode>('day');
+  const [cutawayWalls, setCutawayWalls] = useState(false);
+  const [focusKey, setFocusKey] = useState(0);
   const [pendingAiAction, setPendingAiAction] = useState<(() => void) | null>(null);
 
   useEffect(() => {
@@ -349,7 +359,7 @@ export default function App({
         defaultSpecs = { Size: '1.9 m wide', Drive: 'Electric drop', Mounting: 'Wall / ceiling' };
         break;
       default:
-        label = `Generic Workspace Item`;
+        label = isHouseAssetType(type) ? HOUSE_ASSET_SPECS[type].label : `Generic Workspace Item`;
     }
 
     const newAsset: PlacedAsset = {
@@ -654,6 +664,35 @@ export default function App({
     }
   };
 
+  /** Replace the whole workspace with a generated house (undoable). */
+  const handleApplyHouse = (house: GeneratedHouse) => {
+    const next = normalizeDesign(house.design);
+    update(() => next);
+    setActiveLevelId(next.levels[0].id);
+    setSelectedAssetId(null);
+    setViewMode('3D');
+    setBlueprintImage(null);
+    setStacked(false);
+    setFocusKey((k) => k + 1);
+    setShowHouseDesigner(false);
+    showToast(`${house.meta.styleName} house applied: ${next.rooms.length} rooms, ${next.assets.length} items. Use the lighting buttons to preview evening and night.`);
+  };
+
+  /** Let Gemini read a house request (own key, or the hosted plan). */
+  const handleHouseBriefAi = async (text: string) => {
+    if (!geminiApiKey && !hostedAiWorkspaceId) { setShowApiKeyModal(true); return null; }
+    try {
+      const raw = geminiApiKey
+        ? await houseBriefClient(geminiApiKey, text)
+        : await houseBriefHosted(hostedAiWorkspaceId as string, text);
+      return sanitizeAiBrief(raw);
+    } catch (err: any) {
+      if (err.status === 402) onUpgradeNeeded?.();
+      else if ((err.status === 401 || err.status === 403) && geminiApiKey) setShowApiKeyModal(true);
+      throw err;
+    }
+  };
+
   // ---- Floors ----
   // The stack only makes sense in 3D with at least two floors.
   const canStack = viewMode === '3D' && doc.levels.length > 1;
@@ -883,6 +922,35 @@ export default function App({
             </button>
           </div>
 
+          {/* Time-of-day lighting preview (evening and night switch the house lights on) */}
+          <div className="flex bg-slate-100 p-1 rounded-lg mr-2" role="group" aria-label="Lighting preview" id="header-lighting-selector">
+            {(Object.keys(LIGHTING_PRESETS) as LightingMode[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                aria-pressed={lightingMode === m}
+                onClick={() => setLightingMode(m)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                  lightingMode === m ? 'bg-white shadow-sm text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-900'
+                }`}
+                title={`${LIGHTING_PRESETS[m].label} lighting preview`}
+              >
+                {LIGHTING_PRESETS[m].label}
+              </button>
+            ))}
+            <button
+              type="button"
+              aria-pressed={cutawayWalls}
+              onClick={() => setCutawayWalls((v) => !v)}
+              className={`ml-1 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                cutawayWalls ? 'bg-white shadow-sm text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-900'
+              }`}
+              title="Cut the house walls down to waist height to see inside"
+            >
+              Cutaway
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={() => {
@@ -921,6 +989,17 @@ export default function App({
           >
             <Key className={`w-3.5 h-3.5 ${geminiApiKey ? 'text-cyan-600' : 'text-amber-600'}`} />
             <span className="hidden xl:inline">{geminiApiKey ? 'API Key Active' : 'Set API Key'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowHouseDesigner(true)}
+            className="av-btn av-btn-secondary av-btn-sm"
+            title="Generate a whole house with layout, interior design and lighting"
+            id="open-house-designer"
+          >
+            <HomeIcon className="w-3.5 h-3.5 text-cyan-600" />
+            <span className="hidden lg:inline">House Designer</span>
           </button>
 
           <button
@@ -1015,6 +1094,9 @@ export default function App({
             blueprintOffsetX={blueprintOffsetX}
             blueprintOffsetZ={blueprintOffsetZ}
             blueprintVisible={blueprintVisible}
+            lightingMode={lightingMode}
+            cutawayWalls={cutawayWalls}
+            focusKey={focusKey}
             captureRef={captureRef}
           />
           <LevelBar
@@ -1198,6 +1280,15 @@ export default function App({
             </div>
           </div>
         </div>
+      )}
+
+      {showHouseDesigner && (
+        <HouseDesigner
+          onClose={() => setShowHouseDesigner(false)}
+          onApply={handleApplyHouse}
+          replacesDesign={doc.rooms.length > 0 || doc.assets.length > 0}
+          ai={{ available: Boolean(geminiApiKey || hostedAiWorkspaceId), read: handleHouseBriefAi }}
+        />
       )}
 
       {/* Share / Export Modal Component */}

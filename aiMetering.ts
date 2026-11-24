@@ -12,7 +12,8 @@
 import type { Express, Request, Response } from "express";
 import { createHash } from "crypto";
 import { admin, isAdminConfigured, getUserFromRequest, isWorkspaceMember } from "./serverSupabase";
-import { getGeminiClient, generateLayoutWithRetry, GeminiRequestError } from "./serverGemini";
+import { getGeminiClient, generateJsonWithRetry, generateLayoutWithRetry, GeminiRequestError } from "./serverGemini";
+import { HOUSE_BRIEF_SCHEMA, buildHouseBriefInstructions } from "./src/shared/houseSpec";
 import { DIGITIZE_PROMPT, buildRebuildInstructions } from "./src/shared/geminiSpec";
 import { PlanId, aiCreditsForPlan } from "./src/shared/plans";
 import { validateDigitizeInput, validatePromptInput } from "./src/shared/validation";
@@ -152,7 +153,8 @@ async function handle(
   ctx: { workspaceId: string; plan: PlanId },
   kind: string,
   key: string,
-  contents: any
+  contents: any,
+  schema?: unknown
 ) {
   // 1. Cache hit — free, instant, no credit consumed.
   const cached = await getCached(ctx.workspaceId, key);
@@ -164,7 +166,7 @@ async function handle(
   const ai = getGeminiClient(); // platform key
   if (!ai) return res.status(503).json({ error: "Hosted AI is not available." });
   try {
-    const response = await generateLayoutWithRetry(ai, contents);
+    const response = schema ? await generateJsonWithRetry(ai, contents, schema) : await generateLayoutWithRetry(ai, contents);
     const data = JSON.parse(response.text || "{}");
     await putCache(ctx.workspaceId, key, kind, data); // cache before metering
     const used = await consumeCredit(ctx.workspaceId); // only meter on success
@@ -207,6 +209,20 @@ export async function meteredRebuild(req: Request, res: Response) {
   return handle(res, ctx, "rebuild", key, [{ text: buildRebuildInstructions(prompt) }]);
 }
 
+/**
+ * Hosted, metered house-brief extraction: turns a free-text house request into a
+ * structured brief (rooms, style, finishes). Same auth, caching and credits as rebuild.
+ */
+export async function meteredHouseBrief(req: Request, res: Response) {
+  const ctx = await authWorkspace(req, res);
+  if (!ctx) return;
+  const input = validatePromptInput(req.body);
+  if (!input.ok) return res.status(400).json({ error: input.error });
+  const { prompt } = input.value;
+  const key = cacheKey("house-brief", prompt.trim().toLowerCase());
+  return handle(res, ctx, "house-brief", key, [{ text: buildHouseBriefInstructions(prompt) }], HOUSE_BRIEF_SCHEMA);
+}
+
 export function registerMeteredAiRoutes(app: Express) {
   // Remaining hosted-AI credits for the current month.
   app.get("/api/ai/usage", async (req: Request, res: Response) => {
@@ -229,4 +245,5 @@ export function registerMeteredAiRoutes(app: Express) {
 
   app.post("/api/ai/digitize", meteredDigitize);
   app.post("/api/ai/rebuild", meteredRebuild);
+  app.post("/api/ai/house-brief", meteredHouseBrief);
 }

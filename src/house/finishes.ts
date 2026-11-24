@@ -46,7 +46,7 @@ export const FLOOR_FINISHES: Finish[] = [
   f({ id: 'travertine', name: 'Honed Travertine', surface: 'floor', kind: 'stone', pattern: 'grid', colors: ['#e3d6bf', '#c9b895'], tile: [0.6, 0.4], roughness: 0.5, wet: true, pricePerSqm: 110 }),
   f({ id: 'slate', name: 'Natural Slate', surface: 'floor', kind: 'stone', pattern: 'grid', colors: ['#4b5258', '#2f353a'], tile: [0.6, 0.3], roughness: 0.6, wet: true, pricePerSqm: 85 }),
   f({ id: 'oak_plank', name: 'Natural Oak Planks', surface: 'floor', kind: 'wood', pattern: 'plank', colors: ['#c9a273', '#a8814f', '#dcbb90'], tile: [1.2, 0.18], roughness: 0.5, pricePerSqm: 70 }),
-  f({ id: 'oak_herringbone', name: 'Oak Herringbone', surface: 'floor', kind: 'wood', pattern: 'herringbone', colors: ['#c19a6b', '#9a7547', '#d6b484'], tile: [0.6, 0.6], roughness: 0.5, pricePerSqm: 130 }),
+  f({ id: 'oak_chevron', name: 'Oak Chevron Parquet', surface: 'floor', kind: 'wood', pattern: 'chevron', colors: ['#c19a6b', '#9a7547', '#d6b484'], tile: [0.6, 0.6], roughness: 0.5, pricePerSqm: 130 }),
   f({ id: 'walnut_plank', name: 'Walnut Planks', surface: 'floor', kind: 'wood', pattern: 'plank', colors: ['#6b4a33', '#4f3425', '#85604a'], tile: [1.2, 0.2], roughness: 0.45, pricePerSqm: 120 }),
   f({ id: 'grey_wood', name: 'Washed Grey Planks', surface: 'floor', kind: 'wood', pattern: 'plank', colors: ['#a9a6a0', '#8d8a84', '#c0bdb6'], tile: [1.2, 0.18], roughness: 0.55, pricePerSqm: 65 }),
   f({ id: 'concrete', name: 'Polished Concrete', surface: 'floor', kind: 'concrete', pattern: 'solid', colors: ['#a6a8a8', '#929494'], tile: [1.5, 1.5], roughness: 0.4, wet: true, pricePerSqm: 60 }),

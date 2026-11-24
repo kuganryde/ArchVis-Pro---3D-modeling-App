@@ -87,6 +87,16 @@ uploaded blueprint image or a text prompt into a fully editable layout.
 - Inventory / Bill of Materials / heatmaps show the **active floor**; the Building
   summary and PDF report give whole-building totals.
 
+### House Designer
+- **Whole-house generator** — describe a home (*"modern 3 bedroom, 2 bathroom with a study, marble
+  bathrooms and floral wallpaper"*) and get a floor plan with doors and windows, furniture,
+  decor, lighting, tiles and wallpapers. 1-6 bedrooms, one or two storeys, 10 design styles,
+  three layout variations at a time and a finish schedule with costs.
+- **Lighting preview** — Day / Evening / Night switch on the fixtures (up to 24 real lights),
+  and **Cutaway** drops the walls to waist height so you can see inside.
+- Works offline with the built-in request reader; **Read with AI** adds Gemini for nuance.
+  Details: [`docs/HOUSE_DESIGNER.md`](docs/HOUSE_DESIGNER.md).
+
 ### 3D assets & isometric icons
 - **Real models for the furniture.** Chairs, tables, desk clusters, the reception counter,
   cabinet and plant use CC0 models from the free [KayKit Furniture Bits](https://github.com/KayKit-Game-Assets/KayKit-Furniture-Bits-1.0)

@@ -12,6 +12,7 @@ import {
   buildRebuildInstructions,
   classifyGeminiError,
 } from '../shared/geminiSpec';
+import { HOUSE_BRIEF_SCHEMA, buildHouseBriefInstructions } from '../shared/houseSpec';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const MAX_ATTEMPTS_PER_MODEL = 3;
@@ -31,7 +32,7 @@ export class GeminiClientError extends Error {
  * errors (rate limit, 5xx, network) are retried; invalid-key / permission /
  * bad-request errors fail fast with a clean message.
  */
-async function generateLayout(apiKey: string, contents: any): Promise<any> {
+async function generateLayout(apiKey: string, contents: any, schema: unknown = LAYOUT_RESPONSE_SCHEMA): Promise<any> {
   const cleanedKey = (apiKey || '').trim();
   if (!cleanedKey) {
     throw new GeminiClientError(401, 'A Gemini API key is required.');
@@ -52,7 +53,7 @@ async function generateLayout(apiKey: string, contents: any): Promise<any> {
           contents,
           config: {
             responseMimeType: 'application/json',
-            responseSchema: LAYOUT_RESPONSE_SCHEMA,
+            responseSchema: schema as any,
           },
         });
         return JSON.parse(response.text || '{}');
@@ -91,4 +92,9 @@ export async function digitizeBlueprintClient(
 /** Generate a raw { rooms, assets } layout from a free-text description. */
 export async function rebuildFromPromptClient(apiKey: string, prompt: string): Promise<any> {
   return generateLayout(apiKey, [{ text: buildRebuildInstructions(prompt) }]);
+}
+
+/** Read a free-text house request into a raw brief (see sanitizeAiBrief). */
+export async function houseBriefClient(apiKey: string, prompt: string): Promise<any> {
+  return generateLayout(apiKey, [{ text: buildHouseBriefInstructions(prompt) }], HOUSE_BRIEF_SCHEMA);
 }

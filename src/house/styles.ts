@@ -47,7 +47,7 @@ export const DESIGN_STYLES: DesignStyle[] = [
   {
     id: 'scandinavian', name: 'Scandinavian', blurb: 'Pale oak, white walls, soft textiles and warm light.',
     palette: { wood: '#d3b48a', fabrics: ['#d9d3c7', '#8f9fa8', '#c9b79c'], rug: '#e3ddd0', cabinet: '#f2f0ea', swatches: ['#f7f5ef', '#d3b48a', '#8f9fa8', '#c9b79c'] },
-    floors: { living: ['oak_plank', 'oak_herringbone'], bedroom: ['oak_plank', 'carpet_oat'], wet: ['porcelain_white', 'porcelain_grey'], kitchen: ['oak_plank', 'porcelain_white'], circulation: ['oak_plank'] },
+    floors: { living: ['oak_plank', 'oak_chevron'], bedroom: ['oak_plank', 'carpet_oat'], wet: ['porcelain_white', 'porcelain_grey'], kitchen: ['oak_plank', 'porcelain_white'], circulation: ['oak_plank'] },
     walls: { living: ['paint_white', 'paint_warm_white'], bedroom: ['paint_warm_white', 'paint_sky'], wet: ['tile_subway_white'], kitchen: ['paint_white'], circulation: ['paint_white'] },
     accents: ['wp_stripe_sage', 'wp_floral_blush', 'paint_sky'], accentRooms: ['master_bedroom', 'dining'],
     lighting: { kelvin: 2800, fixtures: 'mixed', brightness: 0.85 }, decor: { art: true, rugs: true, curtains: true, plants: 3 },
@@ -71,7 +71,7 @@ export const DESIGN_STYLES: DesignStyle[] = [
   {
     id: 'mid_century', name: 'Mid-Century', blurb: 'Walnut, mustard and teal accents, geometric papers.',
     palette: { wood: '#7a5238', fabrics: ['#cf9f3a', '#3c7f86', '#b5603f'], rug: '#d7c7a6', cabinet: '#7a5238', swatches: ['#7a5238', '#cf9f3a', '#3c7f86', '#f1ebe0'] },
-    floors: { living: ['walnut_plank', 'oak_herringbone'], bedroom: ['walnut_plank', 'oak_plank'], wet: ['checker_bw', 'porcelain_white'], kitchen: ['checker_bw', 'walnut_plank'], circulation: ['walnut_plank'] },
+    floors: { living: ['walnut_plank', 'oak_chevron'], bedroom: ['walnut_plank', 'oak_plank'], wet: ['checker_bw', 'porcelain_white'], kitchen: ['checker_bw', 'walnut_plank'], circulation: ['walnut_plank'] },
     walls: { living: ['paint_warm_white', 'paint_mustard'], bedroom: ['paint_warm_white', 'paint_sky'], wet: ['tile_zellige_green', 'tile_subway_white'], kitchen: ['paint_warm_white'], circulation: ['paint_warm_white'] },
     accents: ['wp_chevron_teal', 'wp_geometric_gold', 'paint_mustard'], accentRooms: ['living', 'dining', 'master_bedroom'],
     lighting: { kelvin: 2700, fixtures: 'pendants', brightness: 0.85 }, decor: { art: true, rugs: true, curtains: true, plants: 2 },
@@ -79,7 +79,7 @@ export const DESIGN_STYLES: DesignStyle[] = [
   {
     id: 'traditional', name: 'Traditional', blurb: 'Damask papers, herringbone timber and warm lamps.',
     palette: { wood: '#6b4a33', fabrics: ['#8a6f5a', '#5f6f63', '#a58a6e'], rug: '#8c6f5b', cabinet: '#e6dfd0', swatches: ['#e6dfd0', '#6b4a33', '#5f6f63', '#a58a6e'] },
-    floors: { living: ['oak_herringbone', 'walnut_plank'], bedroom: ['carpet_oat', 'oak_plank'], wet: ['marble_white', 'checker_bw'], kitchen: ['travertine', 'oak_herringbone'], circulation: ['oak_herringbone'] },
+    floors: { living: ['oak_chevron', 'walnut_plank'], bedroom: ['carpet_oat', 'oak_plank'], wet: ['marble_white', 'checker_bw'], kitchen: ['travertine', 'oak_chevron'], circulation: ['oak_chevron'] },
     walls: { living: ['paint_warm_white', 'paint_greige'], bedroom: ['paint_blush', 'paint_warm_white'], wet: ['tile_subway_white', 'tile_marble_wall'], kitchen: ['paint_warm_white'], circulation: ['paint_warm_white'] },
     accents: ['wp_damask_grey', 'wp_floral_botanical', 'wp_stripe_navy'], accentRooms: ['dining', 'master_bedroom', 'foyer'],
     lighting: { kelvin: 2700, fixtures: 'sconces', brightness: 0.8 }, decor: { art: true, rugs: true, curtains: true, plants: 2 },
@@ -95,7 +95,7 @@ export const DESIGN_STYLES: DesignStyle[] = [
   {
     id: 'luxury', name: 'Luxury Art Deco', blurb: 'Marble, deep teal, brass-gold papers and layered light.',
     palette: { wood: '#3b2a22', fabrics: ['#1f4a4f', '#c9a24a', '#2b2b33'], rug: '#2c2f3a', cabinet: '#1f2a3a', swatches: ['#14323a', '#c9a24a', '#f4f4f2', '#2b2b33'] },
-    floors: { living: ['marble_white', 'marble_black'], bedroom: ['carpet_oat', 'oak_herringbone'], wet: ['marble_black', 'marble_white'], kitchen: ['marble_white', 'checker_bw'], circulation: ['marble_white', 'checker_bw'] },
+    floors: { living: ['marble_white', 'marble_black'], bedroom: ['carpet_oat', 'oak_chevron'], wet: ['marble_black', 'marble_white'], kitchen: ['marble_white', 'checker_bw'], circulation: ['marble_white', 'checker_bw'] },
     walls: { living: ['paint_warm_white', 'paint_navy'], bedroom: ['paint_navy', 'paint_blush'], wet: ['tile_marble_wall'], kitchen: ['paint_warm_white', 'paint_navy'], circulation: ['paint_warm_white'] },
     accents: ['wp_deco_fan', 'wp_geometric_gold', 'wp_damask_teal'], accentRooms: ['living', 'master_bedroom', 'dining', 'foyer'],
     lighting: { kelvin: 2700, fixtures: 'mixed', brightness: 0.85 }, decor: { art: true, rugs: true, curtains: true, plants: 2 },

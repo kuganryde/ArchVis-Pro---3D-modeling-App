@@ -44,7 +44,7 @@ const MAX_ATTEMPTS_PER_MODEL = 3;
  * errors (rate limit / 5xx / network) are retried; auth / bad-request errors
  * fail fast.
  */
-export const generateLayoutWithRetry = async (ai: any, contents: any) => {
+export const generateJsonWithRetry = async (ai: any, contents: any, schema: unknown = LAYOUT_RESPONSE_SCHEMA) => {
   let lastClassified: ClassifiedError | null = null;
 
   for (const model of MODELS_TO_TRY) {
@@ -56,7 +56,7 @@ export const generateLayoutWithRetry = async (ai: any, contents: any) => {
           contents,
           config: {
             responseMimeType: "application/json",
-            responseSchema: LAYOUT_RESPONSE_SCHEMA,
+            responseSchema: schema,
           },
         });
         console.log(`AI Layout successfully parsed with model ${model}!`);
@@ -88,3 +88,6 @@ export const generateLayoutWithRetry = async (ai: any, contents: any) => {
     }
   );
 };
+
+/** Layout generation (the original name; same pipeline with the layout schema). */
+export const generateLayoutWithRetry = (ai: any, contents: any) => generateJsonWithRetry(ai, contents, LAYOUT_RESPONSE_SCHEMA);

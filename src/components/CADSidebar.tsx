@@ -25,6 +25,7 @@ import { isOverlapping, isAssetOutsideRooms } from '../utils/geometry';
 import { showToast } from '../utils/toast';
 import BomPanel from './BomPanel';
 import IsoThumb from './IsoThumb';
+import { HOUSE_ASSET_SPECS, HOUSE_ASSET_TYPES } from '../house/assetSpecs';
 
 import { csvRow } from '../utils/csv';
 interface CADSidebarProps {
@@ -247,6 +248,8 @@ export default function CADSidebar({
     { type: 'reception_desk', category: 'furniture', label: 'Reception Counter', desc: 'Circular design blue front marble countertop.' },
     { type: 'whiteboard', category: 'furniture', label: 'Whiteboard Stand', desc: 'Dual stand physical marker writing board.' },
     { type: 'projector_screen', category: 'furniture', label: 'Projector Screen', desc: 'Wall or ceiling pull-down screen, 1.9 m viewing width.' },
+    // House designer: furniture, fixtures, lights and decor, grouped by room type.
+    ...HOUSE_ASSET_TYPES.map((t) => ({ type: t as string, category: 'furniture', label: HOUSE_ASSET_SPECS[t].label, desc: HOUSE_ASSET_SPECS[t].desc, group: HOUSE_ASSET_SPECS[t].group, count: undefined as number | undefined })),
   ];
 
   // Calculations for dashboard
@@ -544,11 +547,16 @@ export default function CADSidebar({
                 <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1 select-none">
                   {libraryCatalog
                     .filter(item => activeCategoryFilter === 'all' || item.category === activeCategoryFilter)
-                    .map((item) => {
+                    .map((item, idx, visible) => {
                       const currentPlacedCount = assets.filter(a => a.type === item.type).length;
+                      const group = (item as { group?: string }).group;
+                      const showHeading = group && (idx === 0 || (visible[idx - 1] as { group?: string }).group !== group);
                       return (
+                        <React.Fragment key={item.type}>
+                        {showHeading && (
+                          <div className="pt-2 pb-0.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono sticky top-0 bg-white/95">House · {group}</div>
+                        )}
                         <div
-                          key={item.type}
                           onClick={() => onAddAsset(item.type)}
                           className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50 hover:bg-slate-100/80 transition-all cursor-pointer shadow-xs group"
                         >
@@ -570,6 +578,7 @@ export default function CADSidebar({
                             </div>
                           </div>
                         </div>
+                        </React.Fragment>
                       );
                     })}
                 </div>

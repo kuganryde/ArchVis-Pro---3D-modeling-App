@@ -4,6 +4,7 @@
  * in its specs. Values are indicative list prices (USD) — adjust to your vendors.
  */
 import { AssetType } from '../types';
+import { HOUSE_ASSET_SPECS } from '../house/assetSpecs';
 
 export interface CatalogEntry {
   label: string;
@@ -45,6 +46,11 @@ export const ASSET_CATALOG: Partial<Record<AssetType, CatalogEntry>> = {
   door_single: { label: 'Door', manufacturer: '—', model: '—', unitCost: 0 },
   plant_pot: { label: 'Plant Pot', manufacturer: 'Generic', model: 'Ceramic', unitCost: 40 },
 };
+
+// House designer items: one entry per type, priced from the spec table.
+for (const [type, spec] of Object.entries(HOUSE_ASSET_SPECS)) {
+  ASSET_CATALOG[type as AssetType] = { label: spec.label, manufacturer: 'Generic', model: spec.desc, unitCost: spec.cost };
+}
 
 /** Catalogue lookup with a safe fallback. */
 export function catalogFor(type: AssetType): CatalogEntry {

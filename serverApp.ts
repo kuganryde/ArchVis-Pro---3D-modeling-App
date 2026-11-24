@@ -6,9 +6,10 @@
 import express from "express";
 import { DIGITIZE_PROMPT, buildRebuildInstructions } from "./src/shared/geminiSpec";
 import { validateDigitizeInput, validatePromptInput } from "./src/shared/validation";
-import { getGeminiClient, generateLayoutWithRetry, GeminiRequestError } from "./serverGemini";
+import { getGeminiClient, generateJsonWithRetry, generateLayoutWithRetry, GeminiRequestError } from "./serverGemini";
+import { HOUSE_BRIEF_SCHEMA, buildHouseBriefInstructions } from "./src/shared/houseSpec";
 import { registerStripeWebhook, registerBillingRoutes, isBillingConfigured } from "./billing";
-import { registerMeteredAiRoutes, isHostedAiConfigured, meteredDigitize, meteredRebuild } from "./aiMetering";
+import { registerMeteredAiRoutes, isHostedAiConfigured, meteredDigitize, meteredRebuild, meteredHouseBrief } from "./aiMetering";
 import { securityHeaders, apiRateLimiter, aiRateLimiter, jsonErrorHandler } from "./serverSecurity";
 
 /** Body-size ceilings. Only blueprint uploads legitimately need a large body. */
@@ -40,7 +41,7 @@ export function createApp(): express.Express {
 
   // Paid-upstream routes get a much tighter per-IP budget.
   const aiLimit = aiRateLimiter(Number(process.env.AI_RATE_LIMIT) || 10);
-  app.use(["/api/digitize-blueprint", "/api/rebuild-from-prompt", "/api/ai/digitize", "/api/ai/rebuild"], aiLimit);
+  app.use(["/api/digitize-blueprint", "/api/rebuild-from-prompt", "/api/house-brief", "/api/ai/digitize", "/api/ai/rebuild", "/api/ai/house-brief"], aiLimit);
 
   registerBillingRoutes(app);
   registerMeteredAiRoutes(app);
@@ -88,6 +89,23 @@ export function createApp(): express.Express {
       console.error("Error rebuilding from prompt:", error?.message || error);
       const status = error instanceof GeminiRequestError ? error.status : 500;
       return res.status(status).json({ error: error?.message || "Failed to rebuild from prompt." });
+    }
+  });
+
+  app.post("/api/house-brief", async (req, res) => {
+    const clientKey = byokKey(req);
+    if (!clientKey) return meteredHouseBrief(req, res);
+    const input = validatePromptInput(req.body);
+    if (!input.ok) return res.status(400).json({ error: input.error });
+    try {
+      const ai = getGeminiClient(clientKey);
+      if (!ai) return res.status(503).json({ error: "Gemini API Key is required. Please provide it in the UI." });
+      const response = await generateJsonWithRetry(ai, [{ text: buildHouseBriefInstructions(input.value.prompt) }], HOUSE_BRIEF_SCHEMA);
+      return res.json(JSON.parse(response.text || "{}"));
+    } catch (error: any) {
+      console.error("Error reading house request:", error?.message || error);
+      const status = error instanceof GeminiRequestError ? error.status : 500;
+      return res.status(status).json({ error: error?.message || "Failed to read the house request." });
     }
   });
 

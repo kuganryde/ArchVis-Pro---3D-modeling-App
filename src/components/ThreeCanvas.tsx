@@ -5,6 +5,8 @@ import { PlacedAsset, RoomDefinition } from '../types';
 import type { StackView } from '../utils/levels';
 import { buildProceduralAssetMesh } from '../three/proceduralAssets';
 import { instantiateModel, preloadModels } from '../three/modelLibrary';
+import { buildHouseRoom } from '../three/houseWalls';
+import { isHouseRoom, pickLightSources, LIGHTING_PRESETS, type LightingMode } from '../house/lighting';
 import {
   getAssetSize,
   isOverlapping,
@@ -71,6 +73,12 @@ interface ThreeCanvasProps {
   blueprintOffsetX?: number;
   blueprintOffsetZ?: number;
   blueprintVisible?: boolean;
+  /** Time-of-day preview. Evening and night switch on the house lights. Default 'day'. */
+  lightingMode?: LightingMode;
+  /** House rooms: draw walls full height, or cut away to waist height to see inside. */
+  cutawayWalls?: boolean;
+  /** Change this number to re-frame the camera around all rooms (after generating a house). */
+  focusKey?: number;
   // When provided, the canvas registers a snapshot function here so the parent
   // can capture a PNG of the current 3D view for exports.
   captureRef?: React.MutableRefObject<(() => string | null) | null>;
@@ -98,6 +106,9 @@ export default function ThreeCanvas({
   blueprintOffsetX = 0,
   blueprintOffsetZ = 0,
   blueprintVisible = true,
+  lightingMode = 'day',
+  cutawayWalls = false,
+  focusKey = 0,
   captureRef,
 }: ThreeCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -113,6 +124,8 @@ export default function ThreeCanvas({
   const controlsRef = useRef<OrbitControls | null>(null);
   const assetMeshesRef = useRef<Map<string, THREE.Object3D>>(new Map());
   const raycasterRef = useRef<THREE.Raycaster>(new THREE.Raycaster());
+  const ambientRef = useRef<THREE.AmbientLight | null>(null);
+  const sunRef = useRef<THREE.DirectionalLight | null>(null);
 
   // Dragging state
   const isDraggingRef = useRef<boolean>(false);
@@ -211,6 +224,7 @@ export default function ThreeCanvas({
     // Lights
     const ambientLight = new THREE.AmbientLight('#ffffff', 0.65);
     scene.add(ambientLight);
+    ambientRef.current = ambientLight;
 
     const dirLight = new THREE.DirectionalLight('#ffffff', 0.8);
     dirLight.position.set(15, 30, 20);
@@ -219,6 +233,7 @@ export default function ThreeCanvas({
     dirLight.shadow.mapSize.height = 2048;
     dirLight.shadow.bias = -0.0005;
     scene.add(dirLight);
+    sunRef.current = dirLight;
 
     // Decorative floor grid (CAD design layout style)
     const gridMajor = new THREE.GridHelper(60, 60, '#94a3b8', '#cbd5e1');
@@ -462,6 +477,16 @@ export default function ThreeCanvas({
         }
       }
 
+      // House rooms (finishes, doors, windows) have their own floor and wall builder.
+      if (isHouseRoom(room)) {
+        const heat = showOccupancyHeatmap || showWifiHeatmap;
+        const override = heat
+          ? new THREE.MeshStandardMaterial({ color: new THREE.Color(floorColor), roughness: 0.9, transparent: true, opacity: 0.75 })
+          : null;
+        roomPlanGroup.add(buildHouseRoom(room, override, { wallHeight: cutawayWalls ? 1.1 : room.wallHeight ?? 2.7, withWalls: viewMode === '3D' }));
+        return;
+      }
+
       const floorMat = new THREE.MeshStandardMaterial({
         color: new THREE.Color(floorColor),
         roughness: 0.9,
@@ -501,7 +526,7 @@ export default function ThreeCanvas({
     });
 
     scene.add(roomPlanGroup);
-  }, [rooms, viewMode, assets, showOccupancyHeatmap, showWifiHeatmap, stackOffset]);
+  }, [rooms, viewMode, assets, showOccupancyHeatmap, showWifiHeatmap, stackOffset, cutawayWalls]);
 
   // Helper to construct architectural walls
   function createWallMesh(
@@ -584,7 +609,7 @@ export default function ThreeCanvas({
       const isSelected = asset.id === selectedAssetId;
       const libraryModel = instantiateModel(asset, { isSelected });
       if (libraryModel) group.add(libraryModel);
-      else buildProceduralAssetMesh(asset, group, { isSelected, viewMode });
+      else buildProceduralAssetMesh(asset, group, { isSelected, viewMode, lightsOn: lightingMode !== 'day' });
 
       // Set transform coordinates based on standard positions loaded
       group.position.set(asset.position.x, asset.position.y, asset.position.z);
@@ -764,7 +789,55 @@ export default function ThreeCanvas({
 
     scene.add(assetsGroup);
     assetMeshesRef.current = meshMap;
-  }, [assets, rooms, selectedAssetId, activeCategoryFilter, activeAssetTypeFilter, viewMode, showWifiHeatmap, showCablingPaths, stackOffset, modelsVersion]);
+  }, [assets, rooms, selectedAssetId, activeCategoryFilter, activeAssetTypeFilter, viewMode, showWifiHeatmap, showCablingPaths, stackOffset, modelsVersion, lightingMode]);
+
+  // Time-of-day preview: ambient and sun levels, background, and real point lights at the fixtures.
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    const preset = LIGHTING_PRESETS[lightingMode];
+    if (ambientRef.current) ambientRef.current.intensity = preset.ambient;
+    if (sunRef.current) { sunRef.current.intensity = preset.sun; sunRef.current.color.set(preset.sunColor); }
+    scene.background = new THREE.Color(preset.background);
+    scene.traverse((o) => {
+      if (o instanceof THREE.GridHelper) {
+        const m = o.material as THREE.Material;
+        m.transparent = true;
+        m.opacity = lightingMode === 'night' ? 0.12 : lightingMode === 'evening' ? 0.5 : 1;
+      }
+    });
+
+    const old: THREE.Object3D[] = [];
+    scene.traverse((o) => { if (o.name === 'HOUSE_LIGHTS_GROUP') old.push(o); });
+    old.forEach((o) => scene.remove(o));
+    if (preset.gain <= 0) return;
+
+    const group = new THREE.Group();
+    group.name = 'HOUSE_LIGHTS_GROUP';
+    group.position.y = stackOffset;
+    for (const s of pickLightSources(assets, preset.gain)) {
+      const light = new THREE.PointLight(new THREE.Color(s.color), s.intensity, s.distance, 2);
+      light.position.set(s.x, s.y, s.z);
+      group.add(light);
+    }
+    scene.add(group);
+  }, [assets, lightingMode, stackOffset]);
+
+  // Re-frame the camera around every room when asked (after generating a house).
+  useEffect(() => {
+    if (!focusKey) return;
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!camera || !controls || rooms.length === 0) return;
+    const minX = Math.min(...rooms.map((r) => r.x - r.width / 2)), maxX = Math.max(...rooms.map((r) => r.x + r.width / 2));
+    const minZ = Math.min(...rooms.map((r) => r.z - r.depth / 2)), maxZ = Math.max(...rooms.map((r) => r.z + r.depth / 2));
+    const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
+    const span = Math.max(maxX - minX, maxZ - minZ);
+    controls.target.set(cx, 0, cz);
+    camera.position.set(cx, span * 1.0 + 4, cz + span * 0.55 + 4);
+    controls.update();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusKey]);
 
   // Cheap content signature of the OTHER floors: the ghost meshes rebuild only when
   // something visible on them changes, not on every edit to the active floor.

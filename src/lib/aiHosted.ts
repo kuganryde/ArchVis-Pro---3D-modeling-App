@@ -42,6 +42,11 @@ export function rebuildFromPromptHosted(workspaceId: string, prompt: string) {
   return authedPost('/api/ai/rebuild', { workspaceId, prompt });
 }
 
+/** Hosted house-request reading → raw brief (see sanitizeAiBrief). */
+export function houseBriefHosted(workspaceId: string, prompt: string) {
+  return authedPost('/api/ai/house-brief', { workspaceId, prompt });
+}
+
 export interface AiUsage {
   enabled: boolean;
   plan?: string;
