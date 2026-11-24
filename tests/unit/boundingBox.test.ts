@@ -71,13 +71,11 @@ const SCALED_FOOTPRINT: Partial<Record<PlacedAsset['type'], { x: number; z: numb
 /**
  * How far a 'height'-fitted model may overhang its declared footprint before the
  * collision and occupancy maths stop matching what is drawn. Everything else must stay
- * within 5%. The two chairs are KNOWN to be larger than their footprint: the library
- * armchair is a wide model scaled to a real 0.85 m height. Tighten these when the
+ * within 5%. The office chair and plant pot are KNOWN to be larger than their footprint. Tighten these when the
  * footprints or models are corrected; the test fails if they get worse.
  */
 const MAX_OVERHANG: Partial<Record<PlacedAsset['type'], number>> = {
   chair_office: 1.25,
-  chair_lounge: 2.1,
   plant_pot: 1.45,
 };
 const DEFAULT_OVERHANG = 1.05;

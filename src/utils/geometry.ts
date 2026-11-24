@@ -59,8 +59,10 @@ export function getAssetSize(asset: PlacedAsset): { width: number; depth: number
     case 'conference_table':
       return { width: scaleX, depth: scaleZ };
     case 'chair_office':
-    case 'chair_lounge':
       return { width: 0.6, depth: 0.6 };
+    case 'chair_lounge':
+      // Real lounge armchairs are about 0.9 m square (the procedural fallback is 1.0 x 0.9).
+      return { width: 0.9, depth: 0.9 };
     case 'reception_desk':
       return { width: 2.4, depth: 1.2 };
     case 'whiteboard':

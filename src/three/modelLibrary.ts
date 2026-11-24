@@ -30,7 +30,9 @@ export interface ModelSpec {
 export const MODEL_SPECS: Partial<Record<AssetType, ModelSpec>> = {
   // Both chairs face +Z in the library; the app's convention is +X, hence the +90° yaw.
   chair_office: { file: 'chair_C.gltf', fit: 'height', height: 0.95, yaw: Math.PI / 2 },
-  chair_lounge: { file: 'armchair_pillows.gltf', fit: 'height', height: 0.85, yaw: Math.PI / 2 },
+  // Stretched to a real 0.9 m square footprint: the library armchair is far wider than deep-in-height,
+  // so fitting it by height alone drew it ~1.2 m wide, twice the footprint used for collisions.
+  chair_lounge: { file: 'armchair_pillows.gltf', fit: 'stretch', height: 0.85, yaw: Math.PI / 2 },
   desk_single: { file: 'table_small.gltf', fit: 'stretch', height: 0.75 },
   desk_cluster_4: { file: 'table_medium.gltf', fit: 'stretch', height: 0.75 },
   desk_cluster_6: { file: 'table_medium_long.gltf', fit: 'stretch', height: 0.75 },
