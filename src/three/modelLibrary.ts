@@ -41,7 +41,8 @@ export const MODEL_SPECS: Partial<Record<AssetType, ModelSpec>> = {
   reception_desk: { file: 'cabinet_medium.gltf', fit: 'stretch', height: 1.1 },
   // These two exist in the type catalogue but used to render as a grey placeholder cube.
   cabinet: { file: 'cabinet_medium.gltf', fit: 'stretch', height: 1.0 },
-  plant_pot: { file: 'cactus_medium_A.gltf', fit: 'height', height: 0.8 },
+  // Stretched to the 0.6 m footprint: fitting by height alone drew it ~0.85 m wide, 42% over the footprint.
+  plant_pot: { file: 'cactus_medium_A.gltf', fit: 'stretch', height: 0.8 },
   // Not listed (kept procedural): wall/ceiling devices (AP, CCTV, ports, intercom, door
   // reader) — no accessible free library offers network/AV hardware — and the whiteboard.
 };

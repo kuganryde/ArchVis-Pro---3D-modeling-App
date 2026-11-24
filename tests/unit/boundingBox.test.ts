@@ -71,12 +71,10 @@ const SCALED_FOOTPRINT: Partial<Record<PlacedAsset['type'], { x: number; z: numb
 /**
  * How far a 'height'-fitted model may overhang its declared footprint before the
  * collision and occupancy maths stop matching what is drawn. Everything else must stay
- * within 5%. The plant pot is KNOWN to be larger than its footprint. Tighten these when the
- * footprints or models are corrected; the test fails if they get worse.
+ * within 5%. Add an entry here only for a known mismatch, and remove it once the footprint
+ * or model is corrected; the test fails if a listed asset gets worse.
  */
-const MAX_OVERHANG: Partial<Record<PlacedAsset['type'], number>> = {
-  plant_pot: 1.45,
-};
+const MAX_OVERHANG: Partial<Record<PlacedAsset['type'], number>> = {};
 const DEFAULT_OVERHANG = 1.05;
 
 /** Same idea for stretched models: the library table_small and cabinet are blocky, so filling a real footprint distorts them. */
