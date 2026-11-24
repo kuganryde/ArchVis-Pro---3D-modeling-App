@@ -3,6 +3,7 @@
  * truth for the icon renderer (scripts/render-iso.mjs) and the tests.
  */
 import type { AssetType } from '../types';
+import { HOUSE_ASSET_TYPES } from '../house/assetSpecs';
 
 export const ISO_ASSET_TYPES: AssetType[] = [
   // Low-current / infrastructure
@@ -10,4 +11,6 @@ export const ISO_ASSET_TYPES: AssetType[] = [
   // Furniture
   'desk_single', 'desk_cluster_4', 'desk_cluster_6', 'conference_table', 'chair_office', 'chair_lounge',
   'reception_desk', 'whiteboard', 'projector_screen', 'cabinet', 'plant_pot',
+  // House designer
+  ...HOUSE_ASSET_TYPES,
 ];

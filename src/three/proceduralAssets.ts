@@ -6,6 +6,8 @@
  */
 import * as THREE from 'three';
 import { PlacedAsset } from '../types';
+import { buildHouseModel } from './houseModels';
+import { isHouseAssetType, HOUSE_ASSET_SPECS } from '../house/assetSpecs';
 import {
   buildCabinetModel, buildDeskModel, buildDeviceModel, buildLcdModel, buildProjectorModel,
   buildScreenModel, buildWhiteboardModel,
@@ -21,6 +23,8 @@ export interface ProceduralOptions {
    * renderer turns it off so the camera itself is visible.
    */
   showCoverage?: boolean;
+  /** Turn on glowing parts of light fixtures (house designer lighting preview). */
+  lightsOn?: boolean;
 }
 
 /** Add the procedural meshes for `asset` to `group` (group origin = asset origin). */
@@ -31,6 +35,16 @@ export function buildProceduralAssetMesh(
 ): void {
   // Furniture is modelled resting on y = 0, but the asset group sits at asset.position.y (0.4
   // by default). Offset it back so it stands on the floor, as library models already do.
+  if (isHouseAssetType(asset.type)) {
+    // Floor-standing models rest on y = 0 whatever the asset's stored height; wall and
+    // ceiling models hang from the stored height (their origin is the mount point).
+    const floor = HOUSE_ASSET_SPECS[asset.type].mount === 'floor';
+    const inner = new THREE.Group();
+    inner.position.y = floor ? -asset.position.y : 0;
+    group.add(inner);
+    buildHouseModel(asset, inner, Boolean(opts.lightsOn));
+    return;
+  }
   if (FLOOR_STANDING.has(asset.type)) {
     const inner = new THREE.Group();
     inner.position.y = -asset.position.y;
