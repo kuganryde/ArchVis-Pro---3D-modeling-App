@@ -6,7 +6,8 @@
  * geometry and materials between instances.
  *
  * Colour tokens: 'P' is the asset's own colour (fabric, paint), 'P2' a lighter and
- * 'P3' a darker shade of it, 'W' the wood tone from asset.specs.Wood. Anything else
+ * 'P3' a darker shade of it, 'W' the wood tone from asset.specs.Wood, 'GLOW' the light
+ * colour from asset.specs.Glow. Anything else
  * is a literal hex colour.
  */
 import * as THREE from 'three';
@@ -188,14 +189,14 @@ export const HOUSE_PARTS: Record<HouseAssetType, (c: Ctx) => Part[]> = {
     bx(0.5, 0.05, 0.01, 0, 0.77, 0.29, DARK),
   ],
 
-  ceiling_light: () => [cy(0.2, 0.2, 0.05, 0, 0, 0, '#fff4d6', { glow: true }), cy(0.2, 0.2, 0.03, 0, 0.05, 0, '#cbd5e1', { metal: 0.5 })],
+  ceiling_light: () => [cy(0.2, 0.2, 0.05, 0, 0, 0, 'GLOW', { glow: true }), cy(0.2, 0.2, 0.03, 0, 0.05, 0, '#cbd5e1', { metal: 0.5 })],
   pendant_light: () => [
     cy(0.09, 0.225, 0.25, 0, 0, 0, 'P', { glow: true, rough: 0.5 }),
-    sp(0.06, 0, 0.16, 0, '#fff4d6', { glow: true }),
+    sp(0.06, 0, 0.16, 0, 'GLOW', { glow: true }),
     cy(0.006, 0.006, 0.62, 0, 0.25, 0, DARK),
     cy(0.05, 0.05, 0.03, 0, 0.87, 0, '#cbd5e1', { metal: 0.5 }),
   ],
-  downlight: () => [cy(0.06, 0.06, 0.01, 0, 0, 0, '#fff4d6', { glow: true }), cy(0.055, 0.055, 0.02, 0, 0.01, 0, '#e5e7eb')],
+  downlight: () => [cy(0.06, 0.06, 0.01, 0, 0, 0, 'GLOW', { glow: true }), cy(0.055, 0.055, 0.02, 0, 0.01, 0, '#e5e7eb')],
   floor_lamp: () => [
     cy(0.15, 0.15, 0.03, 0, 0, 0, METAL, { metal: 0.8 }),
     cy(0.012, 0.012, 1.35, 0, 0.03, 0, METAL, { metal: 0.8 }),
@@ -266,6 +267,7 @@ export function resolveColor(token: string, asset: Pick<PlacedAsset, 'color' | '
     case 'P2': return shade(base, 0.1);
     case 'P3': return shade(base, -0.12);
     case 'W': return asset.specs?.Wood || '#a97c50';
+    case 'GLOW': return asset.specs?.Glow || '#fff4d6';
     default: return token;
   }
 }

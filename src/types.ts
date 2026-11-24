@@ -125,6 +125,8 @@ export interface RoomDefinition {
   floorFinishId?: string;
   /** Wall finish id (paint, wallpaper or wall tile). */
   wallFinishId?: string;
+  /** The wall furniture is arranged around (behind the bed or sofa). It takes the accent finish. */
+  featureWall?: 'n' | 's' | 'e' | 'w';
   /** Optional feature wall: one wall with its own finish, usually a wallpaper. */
   accentWall?: { wall: 'n' | 's' | 'e' | 'w'; finishId: string };
   /** Wall height in metres; defaults to 2.4 for office rooms and 2.7 for house rooms. */
