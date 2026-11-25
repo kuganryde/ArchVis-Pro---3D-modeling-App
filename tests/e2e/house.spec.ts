@@ -68,4 +68,44 @@ test.describe('House Designer', () => {
     await page.getByText('Sofa (3-seat)', { exact: true }).click();
     await expect(page.locator('canvas').first()).toBeVisible();
   });
+
+  test('Relight swaps the lighting scheme of the house in one undo step', async ({ page }) => {
+    const problems: string[] = [];
+    page.on('console', (m) => { if (m.type() === 'error') problems.push(`console.error: ${m.text()}`); });
+    page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
+
+    await page.goto('/');
+    await page.getByText('Launch CAD Workspace').click();
+    // The starting office has no house rooms, so Relight is unavailable.
+    await expect(page.locator('#open-relight')).toBeDisabled();
+
+    await page.locator('#open-house-designer').click();
+    const dialog = page.getByRole('dialog', { name: 'House Designer' });
+    await dialog.getByRole('button', { name: 'Apply to workspace' }).click();
+    await dialog.getByRole('button', { name: 'Replace design' }).click();
+    await expect(dialog).toBeHidden();
+
+    await expect(page.locator('#open-relight')).toBeEnabled();
+    await page.locator('#open-relight').click();
+    const panel = page.getByRole('dialog', { name: 'Relight the house' });
+    await expect(panel).toBeVisible();
+    await panel.getByLabel('Fixtures').selectOption('pendants');
+    await panel.getByLabel('Light colour').selectOption('cool');
+    await panel.getByRole('button', { name: 'Apply lighting' }).click();
+    await expect(panel).toBeHidden();
+    await expect(page.getByText(/Lighting changed to pendants, 4500 K/)).toBeVisible();
+    // The preview switches from Day so the new lights can be seen.
+    await expect(page.getByRole('group', { name: 'Lighting preview' }).getByRole('button', { name: 'Evening', exact: true })).toHaveAttribute('aria-pressed', 'true');
+
+    // Escape closes the panel without changing anything.
+    await page.locator('#open-relight').click();
+    await expect(panel).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(panel).toBeHidden();
+
+    // Undo reverts the relight as a single step (the house is still there).
+    await page.keyboard.press('Control+z');
+    await expect(page.getByText('Living Room').first()).toBeVisible();
+    expect(problems).toEqual([]);
+  });
 });

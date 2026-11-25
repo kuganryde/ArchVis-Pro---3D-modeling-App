@@ -30,6 +30,8 @@ import HouseDesigner from './components/HouseDesigner';
 import { sanitizeAiBrief } from './shared/houseSpec';
 import { HOUSE_ASSET_SPECS, isHouseAssetType } from './house/assetSpecs';
 import { LIGHTING_PRESETS, type LightingMode } from './house/lighting';
+import { relightHouse } from './house/generate';
+import { KELVIN } from './house/furnish';
 import type { GeneratedHouse } from './house/types';
 import {
   RefreshCw,
@@ -50,7 +52,8 @@ import {
   Download,
   Undo2,
   Redo2,
-  Home as HomeIcon
+  Home as HomeIcon,
+  Lightbulb
 } from 'lucide-react';
 
 // Google Analytics measurement ID, configured via the VITE_GA_MEASUREMENT_ID
@@ -152,6 +155,9 @@ export default function App({
   const [showHouseDesigner, setShowHouseDesigner] = useState<boolean>(false);
   const [lightingMode, setLightingMode] = useState<LightingMode>('day');
   const [cutawayWalls, setCutawayWalls] = useState(false);
+  const [showRelight, setShowRelight] = useState(false);
+  const [relightFixtures, setRelightFixtures] = useState<'downlights' | 'pendants' | 'sconces' | 'mixed'>('mixed');
+  const [relightColour, setRelightColour] = useState<'warm' | 'neutral' | 'cool'>('warm');
   const [focusKey, setFocusKey] = useState(0);
   const [pendingAiAction, setPendingAiAction] = useState<(() => void) | null>(null);
 
@@ -678,6 +684,23 @@ export default function App({
     showToast(`${house.meta.styleName} house applied: ${next.rooms.length} rooms, ${next.assets.length} items. Use the lighting buttons to preview evening and night.`);
   };
 
+  /** Swap the lighting scheme of the whole house (every floor) without moving any furniture. One undo step. */
+  useEffect(() => {
+    if (!showRelight) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowRelight(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showRelight]);
+
+  const handleRelight = () => {
+    const uid = `rl${Date.now().toString(36)}`;
+    update((d) => normalizeDesign(relightHouse(d, relightFixtures, KELVIN[relightColour], uid)));
+    setShowRelight(false);
+    // Lights only show when the preview is not "Day".
+    if (lightingMode === 'day') setLightingMode('evening');
+    showToast(`Lighting changed to ${relightFixtures === 'mixed' ? 'mixed fixtures' : relightFixtures}, ${KELVIN[relightColour]} K. Use Undo to revert.`);
+  };
+
   /** Let Gemini read a house request (own key, or the hosted plan). */
   const handleHouseBriefAi = async (text: string) => {
     if (!geminiApiKey && !hostedAiWorkspaceId) { setShowApiKeyModal(true); return null; }
@@ -949,6 +972,49 @@ export default function App({
             >
               Cutaway
             </button>
+          </div>
+
+          {/* Re-light the whole house: fixture style and light colour, furniture untouched */}
+          <div className="relative mr-2">
+            <button
+              type="button"
+              id="open-relight"
+              aria-expanded={showRelight}
+              aria-controls="relight-panel"
+              disabled={!doc.rooms.some((r) => r.kind)}
+              onClick={() => setShowRelight((v) => !v)}
+              className="av-btn av-btn-secondary av-btn-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              title={doc.rooms.some((r) => r.kind) ? 'Change the lighting scheme of the house' : 'Generate a house with the House Designer first'}
+            >
+              <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+              <span className="hidden xl:inline">Relight</span>
+            </button>
+            {showRelight && (
+              <div id="relight-panel" role="dialog" aria-label="Relight the house" className="absolute right-0 top-full mt-2 w-64 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-3 space-y-3">
+                <div>
+                  <label htmlFor="relight-fixtures" className="text-xs font-semibold text-slate-700">Fixtures</label>
+                  <select id="relight-fixtures" value={relightFixtures} onChange={(e) => setRelightFixtures(e.target.value as typeof relightFixtures)} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs">
+                    <option value="mixed">Mixed: downlights, pendants, sconces</option>
+                    <option value="downlights">Recessed downlights</option>
+                    <option value="pendants">Pendants and ceiling lights</option>
+                    <option value="sconces">Ceiling lights with wall sconces</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="relight-colour" className="text-xs font-semibold text-slate-700">Light colour</label>
+                  <select id="relight-colour" value={relightColour} onChange={(e) => setRelightColour(e.target.value as typeof relightColour)} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs">
+                    <option value="warm">Warm (2700 K)</option>
+                    <option value="neutral">Neutral (3500 K)</option>
+                    <option value="cool">Cool daylight (4500 K)</option>
+                  </select>
+                </div>
+                <p className="text-[11px] text-slate-500">Replaces every ceiling light, pendant, downlight and sconce. Furniture and floor lamps stay where they are.</p>
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={() => setShowRelight(false)} className="av-btn av-btn-secondary av-btn-sm">Cancel</button>
+                  <button type="button" onClick={handleRelight} className="av-btn av-btn-primary av-btn-sm">Apply lighting</button>
+                </div>
+              </div>
+            )}
           </div>
 
           <button

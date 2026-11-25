@@ -20,6 +20,9 @@ Open it from **House Designer** in the header.
    (one undo step; it replaces the current design).
 5. In the workspace, use **Day / Evening / Night** to preview the lights and **Cutaway**
    to drop the walls to waist height so the rooms are visible from above.
+6. **Relight** (header) swaps the lighting scheme of the whole house, every floor, without
+   moving any furniture: mixed fixtures, downlights, pendants, or ceiling lights with sconces,
+   in warm (2700 K), neutral (3500 K) or cool (4500 K) light. It is one undo step.
 
 **Read with AI** sends the request to Gemini (your key, or your plan's hosted credits)
 to pick up details the built-in reader misses. Without a key everything else still works.
@@ -81,6 +84,7 @@ model answer can never produce an invalid house.
   inspired. Use the variations, or edit rooms and furniture by hand afterwards.
 - Two-storey houses have no stair void cut in the upper floor, and the staircase is a
   solid block, not a railed stair.
-- Re-styling or re-lighting a design regenerates furniture or lights; pieces you moved are replaced.
+- Re-styling a design regenerates its furniture, so pieces you moved are replaced. Relight only
+  replaces the light fixtures (ceiling lights, pendants, downlights, sconces); floor lamps stay.
 - Costs are indicative list prices, not quotes.
 - Doors are openings (the front door has a leaf); interior door leaves are not modelled.

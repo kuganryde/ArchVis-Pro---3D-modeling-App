@@ -5,6 +5,7 @@ import { getFinish } from '../../src/house/finishes';
 import { getAssetSize, isOverlapping, isAssetOutsideRooms } from '../../src/utils/geometry';
 import { getAssetHeightLayer, type PlacedAsset, type RoomDefinition } from '../../src/types';
 import { DEFAULT_BRIEF, type HouseBrief } from '../../src/house/types';
+import { kelvinColor } from '../../src/house/furnish';
 
 const houses: Array<{ brief: Partial<HouseBrief>; label: string }> = [];
 for (const style of DESIGN_STYLES) for (const [floors, bedrooms, bathrooms, study] of [[1, 2, 1, false], [1, 3, 2, true], [1, 4, 3, false], [2, 3, 2, false], [2, 4, 3, true], [2, 5, 3, false]] as const) {
@@ -194,5 +195,43 @@ describe('generated houses', () => {
       for (let i = 0; i < assets.length; i++) for (let j = i + 1; j < assets.length; j++) expect(isOverlapping(assets[i], assets[j]), `${assets[i].type} vs ${assets[j].type}`).toBe(false);
     }
     expect(rooms.length).toBeGreaterThan(0);
+  });
+
+  it('relight changes the colour temperature of every light and does not pile up fixtures', () => {
+    const base = generateHouse({ styleId: 'modern', floors: 2, bedrooms: 3 }, 'b')!;
+    const isFixture = (t: string) => ['ceiling_light', 'pendant_light', 'downlight', 'wall_sconce'].includes(t);
+    const once = relightHouse(base.design, 'mixed', 4500, 'a');
+    const twice = relightHouse(once, 'mixed', 4500, 'b');
+    expect(twice.assets.filter((a) => isFixture(a.type))).toHaveLength(once.assets.filter((a) => isFixture(a.type)).length);
+    for (const a of once.assets.filter((x) => isFixture(x.type))) {
+      expect(a.specs?.Kelvin).toBe('4500');
+      expect(a.specs?.Glow).toBe(kelvinColor(4500));
+    }
+    // Both floors keep their lights, and every ceiling light stays under the ceiling.
+    for (const level of base.design.levels) expect(once.assets.some((a) => a.levelId === level.id && isFixture(a.type))).toBe(true);
+    for (const a of once.assets.filter((x) => isFixture(x.type) && x.type !== 'wall_sconce')) expect(a.position.y).toBeLessThanOrEqual(2.7);
+  });
+
+  it('each relight scheme gives its own fixtures', () => {
+    const base = generateHouse({ styleId: 'modern' }, 'b')!;
+    const count = (d: typeof base.design, t: string) => d.assets.filter((a) => a.type === t).length;
+    const down = relightHouse(base.design, 'downlights', 3500, 'd');
+    const pend = relightHouse(base.design, 'pendants', 3500, 'p');
+    const sconce = relightHouse(base.design, 'sconces', 3500, 's');
+    expect(count(down, 'downlight')).toBeGreaterThan(count(pend, 'downlight'));
+    expect(count(pend, 'pendant_light')).toBeGreaterThan(0);
+    expect(count(down, 'pendant_light')).toBe(0);
+    expect(count(sconce, 'wall_sconce')).toBeGreaterThan(0);
+    expect(count(down, 'wall_sconce')).toBe(0);
+    // Lights are assigned to rooms and levels that exist.
+    for (const a of sconce.assets.filter((x) => x.type === 'wall_sconce')) {
+      expect(sconce.rooms.some((r) => r.id === a.assignedRoomId)).toBe(true);
+      expect(sconce.levels.some((l) => l.id === a.levelId)).toBe(true);
+    }
+  });
+
+  it('relighting leaves a design with no house rooms untouched', () => {
+    const empty = { levels: [{ id: 'L', name: 'L', elevation: 0, height: 3 }], rooms: [], assets: [] };
+    expect(relightHouse(empty, 'pendants', 2700, 'x')).toEqual(empty);
   });
 });
