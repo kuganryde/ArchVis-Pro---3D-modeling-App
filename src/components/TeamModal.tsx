@@ -120,7 +120,7 @@ export default function TeamModal({ workspaceId, myUserId, myRole, myEmail, onCl
 
   return (
     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white max-w-lg w-full rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[85vh]">
+      <div className="bg-white max-w-lg w-full rounded-2xl  border border-slate-200 flex flex-col max-h-[85vh]">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-2xl">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-600 flex items-center justify-center shadow-inner">
@@ -131,7 +131,7 @@ export default function TeamModal({ workspaceId, myUserId, myRole, myEmail, onCl
               <p className="text-xs text-slate-500 font-medium">Members, roles &amp; invitations</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg">
+          <button onClick={onClose} className="p-2 text-slate-500 hover:text-slate-600 hover:bg-slate-200 rounded-lg">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -162,7 +162,7 @@ export default function TeamModal({ workspaceId, myUserId, myRole, myEmail, onCl
 
               {/* Members */}
               <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
                   Members ({members.length})
                 </div>
                 <div className="space-y-1.5">
@@ -176,7 +176,7 @@ export default function TeamModal({ workspaceId, myUserId, myRole, myEmail, onCl
                           </div>
                           <span className="text-sm text-slate-700 truncate">
                             {m.name}
-                            {m.userId === myUserId && <span className="text-slate-400"> (you)</span>}
+                            {m.userId === myUserId && <span className="text-slate-500"> (you)</span>}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -197,7 +197,7 @@ export default function TeamModal({ workspaceId, myUserId, myRole, myEmail, onCl
                           {canManage && (
                             <button
                               onClick={() => doRemove(m.userId)}
-                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded"
+                              className="p-1 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded"
                               title="Remove member"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -215,7 +215,7 @@ export default function TeamModal({ workspaceId, myUserId, myRole, myEmail, onCl
                 <div className="space-y-3 border-t border-slate-100 pt-4">
                   <form onSubmit={invite} className="flex gap-2">
                     <div className="relative flex-1">
-                      <Mail className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                      <Mail className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-500" />
                       <input
                         type="email"
                         value={email}
@@ -241,11 +241,11 @@ export default function TeamModal({ workspaceId, myUserId, myRole, myEmail, onCl
 
                   {invites.length > 0 && (
                     <div className="space-y-1.5">
-                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pending invites</div>
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Pending invites</div>
                       {invites.map((i) => (
                         <div key={i.id} className="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-50">
                           <span className="text-slate-600 truncate">
-                            {i.email} · <span className="capitalize text-slate-400">{i.role}</span>
+                            {i.email} · <span className="capitalize text-slate-500">{i.role}</span>
                           </span>
                           <button onClick={() => doRevoke(i.id)} className="text-[11px] font-semibold text-rose-600 hover:text-rose-700">
                             Revoke
@@ -254,7 +254,7 @@ export default function TeamModal({ workspaceId, myUserId, myRole, myEmail, onCl
                       ))}
                     </div>
                   )}
-                  <p className="text-[10px] text-slate-400 leading-relaxed">
+                  <p className="text-[10px] text-slate-500 leading-relaxed">
                     Invitees join by signing up (or in) with the invited email — they'll see the invite here to accept.
                     Team seats are a Team-plan feature.
                   </p>

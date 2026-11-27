@@ -97,7 +97,7 @@ export default function LevelBar({
           </div>
           <table className="w-full text-[11px] text-slate-600">
             <thead>
-              <tr className="text-slate-400 text-left">
+              <tr className="text-slate-500 text-left">
                 <th className="font-medium pb-1">Floor</th>
                 <th className="font-medium pb-1 text-right">Rooms</th>
                 <th className="font-medium pb-1 text-right">Assets</th>
@@ -150,7 +150,7 @@ export default function LevelBar({
       )}
 
       <div className="flex items-center gap-1 bg-white/95 backdrop-blur border border-slate-200 rounded-xl shadow-md p-1">
-        <Layers className="w-4 h-4 text-slate-400 mx-1.5" aria-hidden="true" />
+        <Layers className="w-4 h-4 text-slate-500 mx-1.5" aria-hidden="true" />
         <div role="tablist" aria-label="Building floors" className="flex items-center gap-1 max-w-[46vw] overflow-x-auto">
           {summaries.map((s, i) => {
             const isActive = s.level.id === activeLevelId;

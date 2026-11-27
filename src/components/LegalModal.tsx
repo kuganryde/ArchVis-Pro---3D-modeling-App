@@ -18,7 +18,7 @@ export default function LegalModal({
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[130] flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white max-w-3xl w-full rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[88vh]">
+      <div className="bg-white max-w-3xl w-full rounded-2xl  border border-slate-200 flex flex-col max-h-[88vh]">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-2xl shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-600 flex items-center justify-center shadow-inner">
@@ -31,7 +31,7 @@ export default function LegalModal({
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-all">
+          <button onClick={onClose} className="p-2 text-slate-500 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-all">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -77,7 +77,7 @@ export default function LegalModal({
             ))}
           </div>
 
-          <p className="mt-6 text-[10px] text-slate-400 leading-relaxed border-t border-slate-100 pt-3">
+          <p className="mt-6 text-[10px] text-slate-500 leading-relaxed border-t border-slate-100 pt-3">
             {LEGAL.company} · Questions: {LEGAL.contact}
           </p>
         </div>

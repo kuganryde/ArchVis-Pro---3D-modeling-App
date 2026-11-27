@@ -72,7 +72,7 @@ export default function Logo({ size = 36, glow = true }: { size?: number; glow?:
   );
 }
 
-/** Inline wordmark: ARCHVIZ (foreground) + PRO (cyan) + optional tagline. */
+/** Inline wordmark: ARCHVIZ (foreground) + PRO (accent) + optional tagline. */
 export function Wordmark({
   className = '',
   dark = false,
@@ -83,14 +83,13 @@ export function Wordmark({
   tagline?: boolean;
 }) {
   return (
-    <div className={`flex flex-col leading-none ${className}`}>
-      <span className={`font-bold tracking-[0.12em] ${dark ? 'text-white' : 'text-slate-900'}`}>
-        ARCHVIZ <span className="text-cyan-500">PRO</span>
-        <sup className="text-[0.55em] text-cyan-400 ml-0.5">™</sup>
+    <div className={`flex flex-col leading-none whitespace-nowrap ${className}`}>
+      <span className={`font-display font-extrabold tracking-[0.1em] ${dark ? 'text-white' : 'text-slate-900'}`}>
+        ARCHVIZ <span className={dark ? 'text-cyan-300' : 'text-cyan-600'}>PRO</span>
       </span>
       {tagline && (
-        <span className="text-[9px] font-semibold tracking-[0.22em] text-emerald-500 mt-1">
-          // AI DIGITAL TWIN PLATFORM
+        <span className={`hidden 2xl:block text-[10px] font-medium tracking-[0.08em] mt-1 ${dark ? 'text-slate-300' : 'text-slate-500'}`}>
+          3D planning for offices and homes
         </span>
       )}
     </div>

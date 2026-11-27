@@ -1153,7 +1153,7 @@ export default function ThreeCanvas({
           let badgeColor = 'text-emerald-700 bg-emerald-50 border-emerald-200/60';
           let statusText = 'Cozy';
           if (room.loadPercentage > 120) {
-            badgeColor = 'text-rose-700 bg-rose-50 border-rose-200/60 animate-pulse';
+            badgeColor = 'text-rose-700 bg-rose-50 border-rose-200/60';
             statusText = 'Overloaded';
           } else if (room.loadPercentage > 60) {
             badgeColor = 'text-amber-700 bg-amber-50 border-amber-200/60';
@@ -1167,15 +1167,13 @@ export default function ThreeCanvas({
               style={{ left: `${room.x}px`, top: `${room.y}px` }}
             >
               <span
-                className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-white/95 text-slate-800 shadow-xs border border-slate-200 select-none pointer-events-none mb-1 inline-block"
-                style={{ borderLeftColor: room.textColor, borderLeftWidth: '3.5px' }}
+                title={room.name}
+                className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-white/95 text-slate-800 border border-slate-200 select-none pointer-events-none mb-1 inline-block max-w-[10.5rem] truncate"
+                style={{ borderLeftColor: room.textColor, borderLeftWidth: '3px' }}
               >
                 {room.name}
               </span>
               <div className="flex items-center gap-1.5 flex-nowrap shrink-0">
-                <span className="text-[9.5px] font-mono font-bold text-slate-550 bg-white/80 border border-slate-200/50 px-1.5 py-0.5 rounded-md select-none pointer-events-none shadow-3xs">
-                  {room.area} SQFT
-                </span>
                 {showOccupancyHeatmap && (
                   <span className={`text-[9.5px] font-mono font-extrabold px-1.5 py-0.5 border rounded-md shadow-3xs select-none pointer-events-none ${badgeColor}`}>
                     {room.assetCount} Nodes | {room.loadPercentage}% ({statusText})
@@ -1220,13 +1218,13 @@ export default function ThreeCanvas({
                 <div className="space-y-1 border-t border-slate-100 pt-2 font-mono text-[10px] text-slate-600">
                   {Object.entries(hoveredAsset.specs).map(([k, v]) => (
                     <div key={k} className="flex justify-between gap-4">
-                      <span className="text-slate-400 font-bold">{k}:</span>
+                      <span className="text-slate-500 font-bold">{k}:</span>
                       <span className="text-slate-800 font-medium break-all">{v}</span>
                     </div>
                   ))}
                 </div>
               )}
-              <div className="text-[10px] mt-2 text-slate-400 font-mono">Position: X {hoveredAsset.position.x.toFixed(1)}m, Z {hoveredAsset.position.z.toFixed(1)}m</div>
+              <div className="text-[10px] mt-2 text-slate-500 font-mono">Position: X {hoveredAsset.position.x.toFixed(1)}m, Z {hoveredAsset.position.z.toFixed(1)}m</div>
               
               {(() => {
                 const isOutside = isAssetOutsideRooms(hoveredAsset, rooms);
@@ -1235,7 +1233,7 @@ export default function ThreeCanvas({
                   return (
                     <div className="mt-2.5 p-2.5 bg-rose-50 border border-rose-200/60 rounded-xl text-rose-700 text-[10px] font-medium flex flex-col gap-1">
                       <div className="font-bold flex items-center gap-1 font-mono uppercase tracking-wider text-[9px] text-rose-600">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse inline-block" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" />
                         Placement Alert
                       </div>
                       {isOutside && <div className="leading-tight">• Positioning is outside defined room boundaries</div>}
@@ -1252,15 +1250,15 @@ export default function ThreeCanvas({
                 <span className="w-3 h-3 rounded-sm border border-slate-300" style={{ backgroundColor: hoveredRoom.color }} />
                 {hoveredRoom.name}
               </h4>
-              <p className="text-xs text-slate-500 font-mono mb-2">Area: {Math.round(hoveredRoom.width * hoveredRoom.depth * 10.7639)} SQFT (~{(hoveredRoom.width * hoveredRoom.depth).toFixed(1)} m²)</p>
+              <p className="text-xs text-slate-500 font-mono mb-2">Area: {(hoveredRoom.width * hoveredRoom.depth).toFixed(1)} m² · {Math.round(hoveredRoom.width * hoveredRoom.depth * 10.7639)} ft²</p>
               <div className="space-y-1 border-t border-slate-100 pt-2 text-[11px] text-slate-600 flex flex-col gap-0.5">
                 <div className="flex justify-between">
                   <span>Room Width:</span>
-                  <span className="font-semibold text-slate-850">{hoveredRoom.width.toFixed(1)}m</span>
+                  <span className="font-semibold text-slate-900">{hoveredRoom.width.toFixed(1)}m</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Room Depth:</span>
-                  <span className="font-semibold text-slate-850">{hoveredRoom.depth.toFixed(1)}m</span>
+                  <span className="font-semibold text-slate-900">{hoveredRoom.depth.toFixed(1)}m</span>
                 </div>
                 
                 {/* Real-time Occupancy Load Section */}
@@ -1299,10 +1297,10 @@ export default function ThreeCanvas({
                         <span className="font-mono text-slate-500">{capacity} units</span>
                       </div>
                       <div className="flex justify-between items-center border-t border-slate-100 pt-1.5 mt-1.5">
-                        <span className="text-[10px] font-bold text-slate-400 font-mono block uppercase">Load Index:</span>
+                        <span className="text-[10px] font-bold text-slate-500 font-mono block uppercase">Load Index:</span>
                         <span className={`text-xs font-bold ${colorClass}`}>{percentage}%</span>
                       </div>
-                      <div className="text-[10px] italic text-slate-450 mt-1 leading-tight">
+                      <div className="text-[10px] italic text-slate-500 mt-1 leading-tight">
                         Status: <span className={colorClass}>{status}</span>
                       </div>
                     </>
@@ -1317,25 +1315,23 @@ export default function ThreeCanvas({
       {/* Guide indicators */}
       <div className="absolute top-4 left-4 pointer-events-none flex flex-col gap-1.5" id="cad-viewer-shortcuts">
         <div className="px-3 py-1.5 rounded-xl bg-slate-900/90 text-white backdrop-blur-xs text-[11px] font-bold shadow-md flex items-center gap-2 select-none border border-slate-700/30">
-          <span className="inline-block w-2 h-2 relative flex">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-          </span>
-          {viewMode === '3D' ? '3D Orbit Navigation Enabled' : '2D Architectural Blueprint locked'}
+          <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" aria-hidden="true" />
+          {viewMode === '3D' ? '3D view' : '2D plan (view locked)'}
         </div>
         <div className="hidden sm:flex text-[10px] text-slate-500 bg-white/90 border border-slate-200/80 px-3 py-1.5 rounded-xl pointer-events-auto shadow-xs flex-col gap-1 font-mono">
-          <div><b className="text-slate-805">Orbit/Pan:</b> Drag Left Click (3D) or Right Click</div>
-          <div><b className="text-slate-805">Zoom:</b> Scroll Mouse Wheel / Slide Touchpad</div>
-          <div><b className="text-slate-805">Drag:</b> Left-Click hold on any item to move</div>
+          <div><b className="text-slate-800">Orbit:</b> drag the background (3D)</div>
+          <div><b className="text-slate-800">Pan:</b> right-drag</div>
+          <div><b className="text-slate-800">Zoom:</b> scroll or pinch</div>
+          <div><b className="text-slate-800">Move an item:</b> drag it</div>
         </div>
         {showOccupancyHeatmap && (
           <div className="px-3.5 py-2.5 rounded-xl bg-white/95 border border-slate-200 shadow-md text-[10.5px] pointer-events-auto flex flex-col gap-1.5 max-w-[240px] transition-all select-none font-sans">
-            <div className="font-bold text-slate-850 flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-mono">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="font-bold text-slate-900 flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-mono">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
               <span>Occupancy Heatmap</span>
             </div>
             <div className="h-2 w-full rounded bg-gradient-to-r from-emerald-500 via-amber-400 to-rose-500 border border-slate-200/50" />
-            <div className="flex justify-between text-[9px] font-bold text-slate-400 font-mono">
+            <div className="flex justify-between text-[9px] font-bold text-slate-500 font-mono">
               <span>Cozy (0%)</span>
               <span>Optimal (50%)</span>
               <span>Busy (100%+)</span>

@@ -82,7 +82,7 @@ export default function AuthScreen() {
           </p>
         </div>
 
-        <div className="bg-slate-900/70 backdrop-blur-xl rounded-2xl border border-slate-700/70 shadow-2xl p-7">
+        <div className="bg-slate-900/70 backdrop-blur-xl rounded-2xl border border-slate-700/70  p-7">
           <p className="text-sm font-semibold text-slate-200 text-center mb-5">
             {mode === 'signin' ? 'Sign in to your workspace' : 'Create your workspace account'}
           </p>
@@ -143,7 +143,7 @@ export default function AuthScreen() {
               {mode === 'signin' ? 'Sign In' : 'Create Account'}
             </button>
 
-            <p className="text-center text-xs text-slate-400 pt-1">
+            <p className="text-center text-xs text-slate-500 pt-1">
               {mode === 'signin' ? "Don't have an account?" : 'Already have an account?'}{' '}
               <button
                 type="button"

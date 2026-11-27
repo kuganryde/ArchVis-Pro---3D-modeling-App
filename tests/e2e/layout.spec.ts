@@ -2,7 +2,7 @@ import { test, expect, Page } from '@playwright/test';
 
 const launch = async (page: Page) => {
   await page.goto('/');
-  await page.getByText('Launch CAD Workspace').click();
+  await page.getByRole('button', { name: 'Open workspace' }).click();
   await expect(page.getByRole('tablist', { name: 'Building floors' })).toBeVisible();
 };
 

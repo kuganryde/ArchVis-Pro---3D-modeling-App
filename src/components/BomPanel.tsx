@@ -39,7 +39,7 @@ export default function BomPanel({ assets }: { assets: PlacedAsset[] }) {
       </div>
 
       {bom.lines.length === 0 ? (
-        <div className="p-4 text-center text-[11px] text-slate-400">
+        <div className="p-4 text-center text-[11px] text-slate-500">
           Place assets to build a costed bill of materials.
         </div>
       ) : (
@@ -47,7 +47,7 @@ export default function BomPanel({ assets }: { assets: PlacedAsset[] }) {
           <div className="max-h-64 overflow-y-auto">
             <table className="w-full text-[11px]">
               <thead className="sticky top-0 bg-white">
-                <tr className="text-slate-400 font-mono text-[9.5px] uppercase tracking-wider border-b border-slate-100">
+                <tr className="text-slate-500 font-mono text-[9.5px] uppercase tracking-wider border-b border-slate-100">
                   <th className="text-left font-bold px-3 py-1.5">Item</th>
                   <th className="text-right font-bold px-1 py-1.5">Qty</th>
                   <th className="text-right font-bold px-1 py-1.5">Unit</th>
@@ -59,7 +59,7 @@ export default function BomPanel({ assets }: { assets: PlacedAsset[] }) {
                   <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/60">
                     <td className="px-3 py-1.5">
                       <div className="font-semibold text-slate-700 leading-tight">{l.item}</div>
-                      <div className="text-[9.5px] text-slate-400">
+                      <div className="text-[9.5px] text-slate-500">
                         {l.manufacturer}
                         {l.estimated && <span className="ml-1 text-amber-500">· est.</span>}
                       </div>
@@ -83,7 +83,7 @@ export default function BomPanel({ assets }: { assets: PlacedAsset[] }) {
               )}
             </span>
             <div className="text-right">
-              <div className="text-[9px] text-slate-400 font-mono uppercase tracking-wider">Grand Total</div>
+              <div className="text-[9px] text-slate-500 font-mono uppercase tracking-wider">Grand Total</div>
               <div className="text-sm font-extrabold text-slate-900">{formatMoney(bom.grandTotal)}</div>
             </div>
           </div>

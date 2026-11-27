@@ -7,7 +7,7 @@ test.describe('House Designer', () => {
     page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
 
     await page.goto('/');
-    await page.getByText('Launch CAD Workspace').click();
+    await page.getByRole('button', { name: 'Open workspace' }).click();
     await expect(page.locator('canvas').first()).toBeVisible();
 
     await page.locator('#open-house-designer').click();
@@ -53,7 +53,7 @@ test.describe('House Designer', () => {
 
   test('closes with Escape and keeps the current design', async ({ page }) => {
     await page.goto('/');
-    await page.getByText('Launch CAD Workspace').click();
+    await page.getByRole('button', { name: 'Open workspace' }).click();
     await page.locator('#open-house-designer').click();
     await expect(page.getByRole('dialog', { name: 'House Designer' })).toBeVisible();
     await page.keyboard.press('Escape');
@@ -63,7 +63,7 @@ test.describe('House Designer', () => {
 
   test('house furniture can be added from the library', async ({ page }) => {
     await page.goto('/');
-    await page.getByText('Launch CAD Workspace').click();
+    await page.getByRole('button', { name: 'Open workspace' }).click();
     await expect(page.getByText('House · Living')).toBeVisible();
     await page.getByText('Sofa (3-seat)', { exact: true }).click();
     await expect(page.locator('canvas').first()).toBeVisible();
@@ -75,9 +75,11 @@ test.describe('House Designer', () => {
     page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
 
     await page.goto('/');
-    await page.getByText('Launch CAD Workspace').click();
+    await page.getByRole('button', { name: 'Open workspace' }).click();
     // The starting office has no house rooms, so Relight is unavailable.
+    await page.locator('#open-tools').click();
     await expect(page.locator('#open-relight')).toBeDisabled();
+    await page.keyboard.press('Escape');
 
     await page.locator('#open-house-designer').click();
     const dialog = page.getByRole('dialog', { name: 'House Designer' });
@@ -85,6 +87,7 @@ test.describe('House Designer', () => {
     await dialog.getByRole('button', { name: 'Replace design' }).click();
     await expect(dialog).toBeHidden();
 
+    await page.locator('#open-tools').click();
     await expect(page.locator('#open-relight')).toBeEnabled();
     await page.locator('#open-relight').click();
     const panel = page.getByRole('dialog', { name: 'Relight the house' });
@@ -98,6 +101,7 @@ test.describe('House Designer', () => {
     await expect(page.getByRole('group', { name: 'Lighting preview' }).getByRole('button', { name: 'Evening', exact: true })).toHaveAttribute('aria-pressed', 'true');
 
     // Escape closes the panel without changing anything.
+    await page.locator('#open-tools').click();
     await page.locator('#open-relight').click();
     await expect(panel).toBeVisible();
     await page.keyboard.press('Escape');

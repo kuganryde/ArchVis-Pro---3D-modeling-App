@@ -12,7 +12,7 @@ test.describe('ArchViz Pro smoke', () => {
     const res = await page.goto('/');
     expect(res?.headers()['content-security-policy']).toContain("default-src 'self'");
 
-    await page.getByText('Launch CAD Workspace').click();
+    await page.getByRole('button', { name: 'Open workspace' }).click();
     await expect(page.locator('canvas').first()).toBeVisible();
     await expect(page.getByText('Open Working Area', { exact: false }).first()).toBeVisible();
     expect(problems).toEqual([]);
@@ -20,9 +20,10 @@ test.describe('ArchViz Pro smoke', () => {
 
   test('2D plan, heatmap and inventory views work', async ({ page }) => {
     await page.goto('/');
-    await page.getByText('Launch CAD Workspace').click();
+    await page.getByRole('button', { name: 'Open workspace' }).click();
     await page.getByText('2D Plan').click();
-    await page.getByText('Heatmap Overlay').click();
+    await page.locator('#open-tools').click();
+    await page.getByRole('menuitemcheckbox', { name: /Heatmap overlay/ }).click();
     await expect(page.getByText('OCCUPANCY HEATMAP')).toBeVisible();
     await page.getByRole('button', { name: 'Inventory', exact: true }).click();
     await expect(page.getByText('Bill of Materials')).toBeVisible();
@@ -30,7 +31,7 @@ test.describe('ArchViz Pro smoke', () => {
 
   test('inventory CSV export downloads a well-formed, escaped file', async ({ page }) => {
     await page.goto('/');
-    await page.getByText('Launch CAD Workspace').click();
+    await page.getByRole('button', { name: 'Open workspace' }).click();
     await page.getByRole('button', { name: 'Inventory', exact: true }).click();
     const [download] = await Promise.all([
       page.waitForEvent('download'),

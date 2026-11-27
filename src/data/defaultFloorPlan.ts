@@ -3,7 +3,7 @@ import { RoomDefinition, PlacedAsset } from '../types';
 export const DEFAULT_ROOMS: RoomDefinition[] = [
   {
     id: 'long_meeting',
-    name: 'Long Meeting Room (60 Pax)',
+    name: 'Long Meeting Room (60 pax)',
     areaSqFt: 1100,
     color: '#ecfdf5', // Soft teal-green
     x: -12.5,
@@ -80,7 +80,7 @@ export const DEFAULT_ROOMS: RoomDefinition[] = [
   },
   {
     id: 'open_workspace',
-    name: 'Open Working Area (1455 SQFT)',
+    name: 'Open Working Area',
     areaSqFt: 1455,
     color: '#f0f9ff', // Soft azure-blue
     x: 1.0,
@@ -91,7 +91,7 @@ export const DEFAULT_ROOMS: RoomDefinition[] = [
   },
   {
     id: 'finance_hr',
-    name: 'Finance & HR (10 PAX, 510 SQFT)',
+    name: 'Finance & HR (10 pax)',
     areaSqFt: 510,
     color: '#faf5ff', // Soft violetes
     x: 8.5,
@@ -102,7 +102,7 @@ export const DEFAULT_ROOMS: RoomDefinition[] = [
   },
   {
     id: 'admins_room',
-    name: 'Admin\'s Room (123 SQFT)',
+    name: 'Admin\'s Room',
     areaSqFt: 123,
     color: '#fdf2f8', // Soft pinkish
     x: 12.6,
@@ -113,7 +113,7 @@ export const DEFAULT_ROOMS: RoomDefinition[] = [
   },
   {
     id: 'gm_room',
-    name: 'G.M.\'s Room (220 SQFT)',
+    name: 'G.M.\'s Room',
     areaSqFt: 220,
     color: '#eff6ff',
     x: 16.0,
@@ -124,7 +124,7 @@ export const DEFAULT_ROOMS: RoomDefinition[] = [
   },
   {
     id: 'store_120',
-    name: 'Store Room (120 SQFT)',
+    name: 'Store Room',
     areaSqFt: 120,
     color: '#f5f5f4',
     x: 12.6,
@@ -135,7 +135,7 @@ export const DEFAULT_ROOMS: RoomDefinition[] = [
   },
   {
     id: 'packing_discussion',
-    name: 'Packing & Discussion Area (192 SQFT)',
+    name: 'Packing & Discussion Area',
     areaSqFt: 192,
     color: '#fdf4ff',
     x: 16.0,

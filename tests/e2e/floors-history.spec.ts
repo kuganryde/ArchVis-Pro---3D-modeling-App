@@ -2,7 +2,7 @@ import { test, expect, Page } from '@playwright/test';
 
 const launch = async (page: Page) => {
   await page.goto('/');
-  await page.getByText('Launch CAD Workspace').click();
+  await page.getByRole('button', { name: 'Open workspace' }).click();
   await expect(page.getByRole('tablist', { name: 'Building floors' })).toBeVisible();
 };
 
@@ -59,7 +59,7 @@ test.describe('floors', () => {
     await page.getByRole('button', { name: 'Add floor' }).click();
     await page.waitForTimeout(1000); // debounce is 600 ms
     await page.reload();
-    await page.getByText('Launch CAD Workspace').click();
+    await page.getByRole('button', { name: 'Open workspace' }).click();
     await expect(page.getByRole('tab', { name: 'Level 2' })).toBeVisible();
   });
 });
@@ -117,7 +117,8 @@ test.describe('undo / redo', () => {
     await page.getByRole('button', { name: 'Undo' }).click();
     await expect(page.getByRole('tab', { name: 'Level 1 (copy)' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Reset Workspace' }).click();
+    await page.locator('#open-tools').click();
+    await page.getByRole('menuitem', { name: /Reset workspace/ }).click();
     expect(await assetCount(page, 'Level 1')).toBe(0);
     await page.getByRole('button', { name: 'Undo' }).click();
     expect(await assetCount(page, 'Level 1')).toBe(n);

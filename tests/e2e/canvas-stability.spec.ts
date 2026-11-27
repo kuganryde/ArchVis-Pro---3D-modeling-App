@@ -16,7 +16,7 @@ test('canvas renderer is built once; a drag is exactly one undo step', async ({ 
     (await page.locator('span', { hasText: 'COORDINATE MAP:' }).locator('xpath=..').innerText()).replace(/\s+/g, ' ');
 
   await page.goto('/');
-  await page.getByText('Launch CAD Workspace').click();
+  await page.getByRole('button', { name: 'Open workspace' }).click();
   await expect(page.locator('canvas').first()).toBeVisible();
   const initial = await contexts();
 

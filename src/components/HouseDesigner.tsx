@@ -196,7 +196,7 @@ export default function HouseDesigner({ onClose, onApply, replacesDesign, ai }: 
 
   return (
     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-3 sm:p-4" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="house-designer-title" className="bg-white w-full max-w-6xl max-h-full rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden outline-none">
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="house-designer-title" className="bg-white w-full max-w-6xl max-h-full rounded-2xl  border border-slate-200 flex flex-col overflow-hidden outline-none">
         <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-cyan-100 text-cyan-700 flex items-center justify-center"><Home className="w-5 h-5" /></div>
@@ -348,7 +348,7 @@ export default function HouseDesigner({ onClose, onApply, replacesDesign, ai }: 
                             <td className="px-3 py-1.5"><b className="text-slate-800">{row.room}</b><span className="block text-slate-500">{row.levelName} · {row.areaSqm} m²</span></td>
                             <td className="px-2 py-1.5"><span className="flex items-center gap-1.5"><Swatch id={row.floor.id} size={22} />{row.floor.name}</span></td>
                             <td className="px-2 py-1.5"><span className="flex items-center gap-1.5"><Swatch id={row.wall.id} size={22} />{row.wall.name}</span></td>
-                            <td className="px-2 py-1.5">{row.accent ? <span className="flex items-center gap-1.5"><Swatch id={row.accent.id} size={22} />{row.accent.name}</span> : <span className="text-slate-400">None</span>}</td>
+                            <td className="px-2 py-1.5">{row.accent ? <span className="flex items-center gap-1.5"><Swatch id={row.accent.id} size={22} />{row.accent.name}</span> : <span className="text-slate-500">None</span>}</td>
                           </tr>
                         ))}
                       </tbody>

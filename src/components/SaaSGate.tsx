@@ -145,7 +145,7 @@ function WorkspaceView({ userId, email }: { userId: string; email: string }) {
         );
         if (mine.length) {
           showToast(
-            `You have ${mine.length} workspace invitation${mine.length > 1 ? 's' : ''}. Open Team (👥) to accept.`,
+            `You have ${mine.length} workspace invitation${mine.length > 1 ? 's' : ''}. Open Team to accept.`,
             'info',
             { durationMs: 7000 }
           );
@@ -197,7 +197,7 @@ function WorkspaceView({ userId, email }: { userId: string; email: string }) {
         if (wp.plan !== 'free' || tries >= 5) {
           setPlan(wp.plan);
           clearInterval(timer);
-          if (wp.plan !== 'free') showToast(`You're now on the ${wp.plan} plan. 🎉`, 'success');
+          if (wp.plan !== 'free') showToast(`You're now on the ${wp.plan} plan.`, 'success');
         }
       }, 2000);
     } else if (outcome === 'cancelled') {
@@ -307,7 +307,7 @@ function WorkspaceView({ userId, email }: { userId: string; email: string }) {
         <div className="max-w-md text-center px-4">
           <p className="text-rose-600 font-semibold mb-2">Could not load your workspace</p>
           <p className="text-xs text-slate-500 mb-4">{error}</p>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-slate-500">
             Make sure the database migration in <code>supabase/migrations</code> has been applied.
           </p>
           <button onClick={signOut} className="mt-4 text-xs text-cyan-600 font-semibold hover:underline">
@@ -360,7 +360,7 @@ function WorkspaceView({ userId, email }: { userId: string; email: string }) {
             </option>
           ))}
         </select>
-        <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 pointer-events-none" />
+        <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-2 pointer-events-none" />
       </div>
       <button
         type="button"
@@ -394,7 +394,7 @@ function WorkspaceView({ userId, email }: { userId: string; email: string }) {
       </button>
 
       <div className="h-6 w-px bg-slate-200 mx-1 hidden md:block" />
-      <span className="text-xs text-slate-400 font-medium hidden lg:inline max-w-[160px] truncate" title={email}>
+      <span className="text-xs text-slate-500 font-medium hidden lg:inline max-w-[160px] truncate" title={email}>
         {email}
       </span>
       <button

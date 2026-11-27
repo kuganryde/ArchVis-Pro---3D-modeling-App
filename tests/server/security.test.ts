@@ -34,6 +34,10 @@ describe('security headers', () => {
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).not.toContain("'unsafe-eval'");
+    // Fonts are self-hosted: the policy must not allow Google's font origins.
+    expect(csp).not.toContain('fonts.googleapis.com');
+    expect(csp).not.toContain('fonts.gstatic.com');
+    expect(csp.match(/font-src[^;]*/)?.[0]).toBe("font-src 'self'");
     expect(csp.match(/script-src[^;]*/)?.[0]).not.toContain("'unsafe-inline'");
   });
 });

@@ -31,8 +31,9 @@ export function buildCspDirectives(env: NodeJS.ProcessEnv = process.env) {
     defaultSrc: ["'self'"],
     scriptSrc: ["'self'", "https://cdnjs.cloudflare.com", ...(analytics ? ["https://www.googletagmanager.com"] : [])],
     // Inline styles are required by three.js overlays / motion; scripts stay strict.
-    styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-    fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    // Fonts are self-hosted (@fontsource), so no third-party font origin is needed.
+    fontSrc: ["'self'"],
     imgSrc: ["'self'", "data:", "blob:", ...(supabase ? [supabase] : [])],
     connectSrc: [
       "'self'",

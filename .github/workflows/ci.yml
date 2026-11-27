@@ -31,6 +31,8 @@ jobs:
       # install-time code execution (supply-chain hardening).
       - run: npm ci --ignore-scripts
       - run: npm run lint
+      # Static scan for generic AI-generated UI patterns (emoji icons, neon gradients, buzzwords).
+      - run: python3 -I scripts/vibe_audit.py ./src --fail-on high
       - run: npm run test:coverage
       - run: npm run build
       - uses: actions/upload-artifact@v4

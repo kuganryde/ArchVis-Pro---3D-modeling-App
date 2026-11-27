@@ -23,6 +23,7 @@ import {
 import { PlacedAsset, RoomDefinition } from '../types';
 import { isOverlapping, isAssetOutsideRooms } from '../utils/geometry';
 import { showToast } from '../utils/toast';
+import { planAccessPoints, WIFI_GOOD_RANGE_M } from '../utils/wifi';
 import BomPanel from './BomPanel';
 import IsoThumb from './IsoThumb';
 import { HOUSE_ASSET_SPECS, HOUSE_ASSET_TYPES } from '../house/assetSpecs';
@@ -32,7 +33,8 @@ interface CADSidebarProps {
   rooms: RoomDefinition[];
   assets: PlacedAsset[];
   selectedAsset: PlacedAsset | null;
-  onAddAsset: (type: string) => void;
+  /** Add an asset; `at` places it (e.g. an access point at a room centre) instead of the origin. */
+  onAddAsset: (type: string, at?: { x: number; z: number; roomId?: string }) => void;
   onUpdateAssetSpecs: (id: string, specs: Record<string, string>, name: string, rotate: number, roomId?: string) => void;
   onDeleteAsset: (id: string) => void;
   onAddRoom: (room: Omit<RoomDefinition, 'id'>) => void;
@@ -398,7 +400,7 @@ export default function CADSidebar({
               
               {/* Quick Filter Categories */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block font-mono">Layer Filters</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block font-mono">Layer Filters</label>
                 <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-50 p-1 border border-slate-200/60">
                   <button
                     type="button"
@@ -429,7 +431,7 @@ export default function CADSidebar({
                     className={`py-1 text-[11px] text-center rounded-lg transition-all font-semibold flex items-center justify-center gap-1 cursor-pointer ${
                       activeCategoryFilter === 'furniture' 
                         ? 'bg-orange-600 text-white shadow-sm' 
-                        : 'text-slate-550 hover:text-slate-900'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <Layout className="w-3 h-3" />
@@ -442,8 +444,8 @@ export default function CADSidebar({
               <div className="p-3.5 rounded-xl border border-cyan-100 bg-gradient-to-br from-cyan-50/50 to-cyan-50/20 space-y-3 shadow-3xs" id="network-telemetry-panel">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <Wifi className="w-4 h-4 text-cyan-600 animate-pulse" />
-                    <span className="text-xs font-bold text-slate-800 tracking-tight font-sans">Network Infrastructure Overlays</span>
+                    <Wifi className="w-4 h-4 text-cyan-600" />
+                    <span className="text-xs font-bold text-slate-800 tracking-tight font-sans">Network overlays</span>
                   </div>
                   <span className="text-[9.5px] font-mono font-bold bg-cyan-100 text-cyan-700 px-1.5 py-0.5 rounded-md">MDU v1.5</span>
                 </div>
@@ -455,7 +457,7 @@ export default function CADSidebar({
                     className={`py-1.5 px-2 text-[11px] rounded-lg border font-semibold flex items-center justify-center gap-1 cursor-pointer transition-all ${
                       showWifiHeatmap 
                         ? 'bg-cyan-600 border-cyan-600 text-white font-bold shadow-xs' 
-                        : 'bg-white border-slate-200 text-slate-650 hover:bg-slate-50'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                     }`}
                   >
                     <Wifi className="w-3.5 h-3.5" />
@@ -467,7 +469,7 @@ export default function CADSidebar({
                     className={`py-1.5 px-2 text-[11px] rounded-lg border font-semibold flex items-center justify-center gap-1 cursor-pointer transition-all ${
                       showCablingPaths 
                         ? 'bg-cyan-600 border-cyan-600 text-white font-bold shadow-xs' 
-                        : 'bg-white border-slate-200 text-slate-650 hover:bg-slate-50'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                     }`}
                   >
                     <Workflow className="w-3.5 h-3.5" />
@@ -478,42 +480,27 @@ export default function CADSidebar({
                 {/* AI Optimal AP Placement Recommendation Engine */}
                 <div className="bg-white/80 border border-slate-200/60 rounded-lg p-2 flex flex-col gap-1.5">
                   <div className="flex justify-between items-center text-[10px] text-slate-500 font-medium">
-                    <span className="font-mono flex items-center gap-1"><Cpu className="w-3 h-3 text-cyan-500" /> Optimal AP Planner</span>
-                    <span className="text-emerald-600 font-bold">Auto-Placement Ready</span>
+                    <span className="font-mono flex items-center gap-1"><Cpu className="w-3 h-3 text-cyan-500" /> Access point planner</span>
+                    <span className="text-emerald-700 font-bold">Ready</span>
                   </div>
-                  <p className="text-[10px] text-slate-550 leading-tight">
-                    Scans spatial plans, computes coverage boundaries, and suggests layouts to eliminate dead zones automatically.
+                  <p className="text-[10px] text-slate-600 leading-tight">
+                    Adds an access point to any room whose centre is more than 6.5 m from the nearest one, the same rule as the Wi-Fi heatmap.
                   </p>
                   <button
                     type="button"
                     onClick={() => {
-                      // Execute intelligent AP dead-zone auto-position placement!
-                      const suggestedRooms = ['open_workspace', 'long_meeting', 'lounge_reception'];
-                      const existingAPs = assets.filter(a => a.type === 'ap');
-                      
-                      let placedCount = 0;
-                      suggestedRooms.forEach(roomId => {
-                        const hasAP = existingAPs.some(ap => ap.assignedRoomId === roomId);
-                        if (!hasAP) {
-                          onAddAsset('ap');
-                          placedCount++;
-                        }
-                      });
-
-                      const toast = document.createElement('div');
-                      toast.className = "fixed bottom-14 right-5 bg-cyan-600 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-cyan-400 z-50 flex items-center gap-2 animate-in slide-in-from-bottom-4 duration-300";
-                      if (placedCount > 0) {
-                        toast.innerHTML = `<span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping"></span><span>Auto-Optimizer placed ${placedCount} high-density Access Points to eliminate dead-zones!</span>`;
-                      } else {
-                        toast.innerHTML = `<span class="w-1.5 h-1.5 bg-cyan-400 rounded-full"></span><span>Coverage is fully optimized. 100% signal boundary achieved!</span>`;
-                      }
-                      document.body.appendChild(toast);
-                      setTimeout(() => toast.remove(), 4000);
+                      const planned = planAccessPoints(rooms, assets.filter((a) => a.type === 'ap').map((a) => a.position));
+                      planned.forEach((p) => onAddAsset('ap', p));
+                      showToast(
+                        planned.length > 0
+                          ? `Added ${planned.length} access point${planned.length === 1 ? '' : 's'}. Every room is now within ${WIFI_GOOD_RANGE_M} m of one.`
+                          : `No change needed: every room is already within ${WIFI_GOOD_RANGE_M} m of an access point.`
+                      );
                     }}
                     className="w-full mt-0.5 bg-slate-900 text-white text-[10.5px] font-bold py-1 px-2.5 rounded-md hover:bg-slate-800 transition-all flex items-center justify-center gap-1 cursor-pointer"
                   >
                     <Plus className="w-3 h-3" />
-                    Auto-Optimize AP Distribution
+                    Add access points where coverage is missing
                   </button>
                 </div>
               </div>
@@ -540,8 +527,8 @@ export default function CADSidebar({
               {/* Instant Instantiate library catalog list */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">CAD Asset Library</label>
-                  <span className="text-[10px] text-slate-400 font-mono">Click to insert on grid</span>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">CAD Asset Library</label>
+                  <span className="text-[10px] text-slate-500 font-mono">Click to insert on grid</span>
                 </div>
                 
                 <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1 select-none">
@@ -554,7 +541,7 @@ export default function CADSidebar({
                       return (
                         <React.Fragment key={item.type}>
                         {showHeading && (
-                          <div className="pt-2 pb-0.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono sticky top-0 bg-white/95">House · {group}</div>
+                          <div className="pt-2 pb-0.5 text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono sticky top-0 bg-white/95">House · {group}</div>
                         )}
                         <div
                           onClick={() => onAddAsset(item.type)}
@@ -594,7 +581,7 @@ export default function CADSidebar({
               <div className="p-4 rounded-xl border border-cyan-100 bg-cyan-50/30 space-y-3">
                 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider font-mono flex items-center gap-1.5">
                   <Settings2 className="w-3.5 h-3.5 text-cyan-600" />
-                  Quick Canvas Actions
+                  Quick actions
                 </h3>
                 
                 <div className="grid grid-cols-2 gap-2">
@@ -631,7 +618,7 @@ export default function CADSidebar({
                       }}
                       className="w-full text-xs py-2 pl-8 pr-3 rounded-lg border border-slate-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all font-sans"                
                     />
-                    <MessageSquare className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+                    <MessageSquare className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-500" />
                   </div>
                 </div>
               </div>
@@ -641,10 +628,10 @@ export default function CADSidebar({
                 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center justify-between border-b border-slate-100 pb-2 mb-1 font-mono">
                   <span className="flex items-center gap-1.5">
                     <FileImage className="w-3.5 h-3.5 text-cyan-600" />
-                    Blueprint Uploader
+                    Blueprint
                   </span>
                   {blueprintImage && (
-                    <span className="text-[10px] bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full border border-green-200 font-bold font-sans animate-pulse">
+                    <span className="text-[10px] bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full border border-green-200 font-bold font-sans">
                       Active Guide
                     </span>
                   )}
@@ -665,11 +652,11 @@ export default function CADSidebar({
                       onChange={handleFileChange} 
                       className="hidden" 
                     />
-                    <Upload className={`w-6 h-6 mb-2 ${blueprintImage ? 'text-cyan-500 animate-bounce' : 'text-slate-400'}`} />
+                    <Upload className={`w-6 h-6 mb-2 ${blueprintImage ? 'text-cyan-500' : 'text-slate-500'}`} />
                     <span className="text-xs font-bold text-slate-700 block">
                       {blueprintImage ? 'Replace active blueprints' : 'Upload floor plan blueprint'}
                     </span>
-                    <span className="text-[10px] text-slate-400 block mt-1 leading-normal">
+                    <span className="text-[10px] text-slate-500 block mt-1 leading-normal">
                       Supports PDF documents, JPEGs, and PNGs
                     </span>
                   </label>
@@ -693,7 +680,7 @@ export default function CADSidebar({
                   <div className="space-y-3 pt-2 bg-slate-50/30 p-3 rounded-lg border border-slate-100">
                     <div className="flex items-center justify-between pb-1 border-b border-slate-100">
                       <span className="text-[10px] font-bold text-slate-800 uppercase tracking-wide font-mono flex items-center gap-1">
-                        <Settings className="w-3 h-3 text-slate-550" /> Trace Calibration
+                        <Settings className="w-3 h-3 text-slate-600" /> Trace Calibration
                       </span>
                       <button
                         type="button"
@@ -796,12 +783,12 @@ export default function CADSidebar({
                           </>
                         ) : (
                           <>
-                            <Sparkles className="w-3.5 h-3.5 text-white animate-pulse" />
+                            <Sparkles className="w-3.5 h-3.5 text-white" />
                             <span>Run AI Digitizer on Blueprint</span>
                           </>
                         )}
                       </button>
-                      <p className="text-[9px] text-slate-400 mt-1.5 leading-normal text-center">
+                      <p className="text-[9px] text-slate-500 mt-1.5 leading-normal text-center">
                         Generates high-precision room spaces and suggested networking hardware automatically in 3D using server-side Gemini Vision OCR models.
                       </p>
                     </div>
@@ -812,12 +799,12 @@ export default function CADSidebar({
               {/* Create dynamic Room Placer form */}
               <form onSubmit={triggerAddRoom} className="p-4 rounded-xl border border-slate-200 bg-slate-50/40 space-y-3">
                 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-200 pb-2 mb-1 font-mono">
-                  <Plus className="w-3.5 h-3.5 text-cyan-600" /> Instantiate Custom Modular Space
+                  <Plus className="w-3.5 h-3.5 text-cyan-600" /> Add a room
                 </h3>
                 
                 <div className="grid grid-cols-2 gap-2.5">
                   <div className="space-y-1 col-span-2">
-                    <label className="text-[10px] font-bold text-slate-400 block font-mono">Room Label / Name</label>
+                    <label className="text-[10px] font-bold text-slate-500 block font-mono">Room Label / Name</label>
                     <input
                       type="text"
                       required
@@ -829,7 +816,7 @@ export default function CADSidebar({
                   </div>
                   
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 block font-mono">Design Area (SQFT) [Auto]</label>
+                    <label className="text-[10px] font-bold text-slate-500 block font-mono">Area (calculated)</label>
                     <input
                       type="text"
                       readOnly
@@ -840,7 +827,7 @@ export default function CADSidebar({
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 block font-mono">Blueprint Color</label>
+                    <label className="text-[10px] font-bold text-slate-500 block font-mono">Blueprint Color</label>
                     <div className="flex gap-1.5 mt-1.5">
                       {['#f0fdf4', '#f0f9ff', '#fffbeb', '#faf5ff', '#fef2f2', '#f5f5f4'].map((color) => (
                         <button
@@ -855,7 +842,7 @@ export default function CADSidebar({
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 block font-mono">Room Width (meters)</label>
+                    <label className="text-[10px] font-bold text-slate-500 block font-mono">Room Width (meters)</label>
                     <input
                       type="number"
                       step="0.1"
@@ -868,7 +855,7 @@ export default function CADSidebar({
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 block font-mono">Room Depth (meters)</label>
+                    <label className="text-[10px] font-bold text-slate-500 block font-mono">Room Depth (meters)</label>
                     <input
                       type="number"
                       step="0.1"
@@ -892,7 +879,7 @@ export default function CADSidebar({
 
               {/* List of active spaces */}
               <div className="space-y-2 font-sans">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block font-mono">Active Spaces</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block font-mono">Active Spaces</label>
                 <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
                   {rooms.map((room) => {
                     const occupantsCount = assets.filter((a) => a.assignedRoomId === room.id).length;
@@ -903,12 +890,12 @@ export default function CADSidebar({
                       >
                         <div className="flex items-center gap-2">
                           <span
-                            className="w-3 h-3 rounded-full border border-slate-300 block shrink-0 animate-pulse"
+                            className="w-3 h-3 rounded-full border border-slate-300 block shrink-0"
                             style={{ backgroundColor: room.color }}
                           />
                           <div>
                             <span className="font-bold text-slate-800 block leading-tight">{room.name}</span>
-                            <span className="text-[10.5px] text-slate-550 font-mono block mt-0.5">{Math.round(room.width * room.depth * 10.7639)} SQFT | {room.width}m x {room.depth}m | {occupantsCount} nodes</span>
+                            <span className="text-[10.5px] text-slate-600 font-mono block mt-0.5">{Math.round(room.width * room.depth * 10.7639)} SQFT | {room.width}m x {room.depth}m | {occupantsCount} nodes</span>
                           </div>
                         </div>
                         
@@ -917,13 +904,13 @@ export default function CADSidebar({
                           <button
                             type="button"
                             onClick={() => onDeleteRoom(room.id)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-650 hover:bg-slate-100 transition-all cursor-pointer"
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-red-700 hover:bg-slate-100 transition-all cursor-pointer"
                             title="Remove Room"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         ) : (
-                          <span className="text-[9px] font-bold text-slate-450 bg-slate-100/50 border border-slate-200/50 px-1.5 py-0.5 rounded-md font-mono uppercase">Default</span>
+                          <span className="text-[9px] font-bold text-slate-500 bg-slate-100/50 border border-slate-200/50 px-1.5 py-0.5 rounded-md font-mono uppercase">Default</span>
                         )}
                       </div>
                     );
@@ -943,11 +930,11 @@ export default function CADSidebar({
 
                 <div className="space-y-2 font-sans">
                   <div className="space-y-0.5">
-                    <label className="text-[9px] font-bold text-slate-400 block font-mono">Select Target Room</label>
+                    <label className="text-[9px] font-bold text-slate-500 block font-mono">Select Target Room</label>
                     <select
                       id="template-target-room"
                       defaultValue={rooms[0]?.id || ''}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-850 focus:outline-none focus:border-cyan-500 font-sans cursor-pointer font-semibold font-sans"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-cyan-500 font-sans cursor-pointer font-semibold font-sans"
                     >
                       {rooms.map(r => (
                         <option key={r.id} value={r.id}>{r.name}</option>
@@ -956,10 +943,10 @@ export default function CADSidebar({
                   </div>
 
                   <div className="space-y-0.5 font-sans">
-                    <label className="text-[9px] font-bold text-slate-400 block font-mono">Select Functional Setup Blueprint</label>
+                    <label className="text-[9px] font-bold text-slate-500 block font-mono">Select Functional Setup Blueprint</label>
                     <select
                       id="template-type-select"
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-850 focus:outline-none focus:border-cyan-500 font-sans cursor-pointer font-semibold font-sans"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-cyan-500 font-sans cursor-pointer font-semibold font-sans"
                     >
                       <option value="boardroom_8">8-Person Boardroom (Specs-loaded Table & A/V)</option>
                       <option value="workstations_4">4-Pax Agile Workspace Group (Bench, Chairs, Data Port)</option>
@@ -992,7 +979,7 @@ export default function CADSidebar({
               {/* Search engine bar */}
               <div className="space-y-2">
                 <div className="relative font-mono">
-                  <Search className="w-4 h-4 absolute left-3 top-3.5 text-slate-400" />
+                  <Search className="w-4 h-4 absolute left-3 top-3.5 text-slate-500" />
                   <input
                     type="text"
                     placeholder="Search MAC, ports, names, Ext..."
@@ -1024,27 +1011,27 @@ export default function CADSidebar({
               {/* Overall totals widget */}
               <div className="grid grid-cols-2 gap-2 bg-slate-55 p-3 rounded-xl border border-slate-200" id="cad-blueprint-analytics-stats">
                 <div className="space-y-0.5">
-                  <span className="text-[9px] uppercase font-mono text-slate-400 tracking-wider font-bold">WiFi Access Points</span>
+                  <span className="text-[9px] uppercase font-mono text-slate-500 tracking-wider font-bold">WiFi Access Points</span>
                   <p className="text-lg font-bold font-mono text-slate-800 flex items-baseline gap-1">
-                    {lowCurrentMetrics.ap} <span className="text-[10px] font-normal text-slate-400">placed</span>
+                    {lowCurrentMetrics.ap} <span className="text-[10px] font-normal text-slate-500">placed</span>
                   </p>
                 </div>
                 <div className="space-y-0.5 border-l border-slate-200 pl-3">
-                  <span className="text-[9px] uppercase font-mono text-slate-400 tracking-wider font-bold">Active Data Ports</span>
+                  <span className="text-[9px] uppercase font-mono text-slate-500 tracking-wider font-bold">Active Data Ports</span>
                   <p className="text-lg font-bold font-mono text-cyan-600 flex items-baseline gap-1">
-                    {lowCurrentMetrics.dp} <span className="text-[10px] font-normal text-slate-400">patched</span>
+                    {lowCurrentMetrics.dp} <span className="text-[10px] font-normal text-slate-500">patched</span>
                   </p>
                 </div>
                 <div className="space-y-0.5 border-t border-slate-200 pt-2 mt-1">
-                  <span className="text-[9px] uppercase font-mono text-slate-400 tracking-wider font-bold">CCTV Systems</span>
+                  <span className="text-[9px] uppercase font-mono text-slate-500 tracking-wider font-bold">CCTV Systems</span>
                   <p className="text-lg font-bold font-mono text-amber-600 flex items-baseline gap-1">
-                    {lowCurrentMetrics.cctv} <span className="text-[10px] font-normal text-slate-400">online</span>
+                    {lowCurrentMetrics.cctv} <span className="text-[10px] font-normal text-slate-500">online</span>
                   </p>
                 </div>
                 <div className="space-y-0.5 border-t border-l border-slate-200 pt-2 mt-1 pl-3">
-                  <span className="text-[9px] uppercase font-mono text-slate-400 tracking-wider font-bold">Total Assets</span>
+                  <span className="text-[9px] uppercase font-mono text-slate-500 tracking-wider font-bold">Total Assets</span>
                   <p className="text-lg font-bold font-mono text-slate-800">
-                    {assets.length} <span className="text-[10px] font-normal text-slate-400 font-sans">objects</span>
+                    {assets.length} <span className="text-[10px] font-normal text-slate-500 font-sans">objects</span>
                   </p>
                 </div>
               </div>
@@ -1055,7 +1042,7 @@ export default function CADSidebar({
               {/* Dynamic Inventory Table */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center text-xs">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Device Log</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">Device Log</label>
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -1097,7 +1084,7 @@ export default function CADSidebar({
                           >
                             <div className="pr-1 max-w-[190px] truncate">
                               <span className="font-bold text-slate-800 block truncate">{asset.name}</span>
-                              <span className="text-[9px] text-slate-400 block truncate font-mono">{roomName}</span>
+                              <span className="text-[9px] text-slate-500 block truncate font-mono">{roomName}</span>
                             </div>
                             
                             <div className="flex items-center gap-1.5 shrink-0 font-mono">
@@ -1124,7 +1111,7 @@ export default function CADSidebar({
                         );
                       })
                     ) : (
-                      <div className="p-4 text-center text-slate-400 text-xs italic font-mono">
+                      <div className="p-4 text-center text-slate-500 text-xs italic font-mono">
                         No devices match the query.
                       </div>
                     )}
@@ -1157,7 +1144,7 @@ export default function CADSidebar({
 
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="space-y-1 col-span-2">
-                <label className="text-[9px] font-bold text-slate-400 block font-mono">Custom Label / Tag</label>
+                <label className="text-[9px] font-bold text-slate-500 block font-mono">Custom Label / Tag</label>
                 <input
                   type="text"
                   value={selectedAsset.name}
@@ -1174,7 +1161,7 @@ export default function CADSidebar({
 
               {/* Dynamic Room Assignment overrides */}
               <div className="space-y-1 col-span-2">
-                <label className="text-[9px] font-bold text-slate-400 block font-mono">Assign Parents (Enclosure Room)</label>
+                <label className="text-[9px] font-bold text-slate-500 block font-mono">Assign Parents (Enclosure Room)</label>
                 <select
                   value={selectedAsset.assignedRoomId || 'unassigned'}
                   onChange={(e) => onUpdateAssetSpecs(
@@ -1196,7 +1183,7 @@ export default function CADSidebar({
               {/* Fine rotation sliders */}
               <div className="space-y-1 col-span-2 flex flex-col gap-0.5">
                 <div className="flex justify-between items-center">
-                  <label className="text-[9px] font-bold text-slate-400 font-mono">Orient Angle (Rotation)</label>
+                  <label className="text-[9px] font-bold text-slate-500 font-mono">Orient Angle (Rotation)</label>
                   <span className="text-[10px] text-cyan-600 font-mono font-bold">{(selectedAsset.rotationY * (180 / Math.PI)).toFixed(0)}°</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1235,7 +1222,7 @@ export default function CADSidebar({
                 return (
                   <div key={key} className="space-y-0.5 font-sans text-[11px]">
                     <div className="flex justify-between items-center">
-                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">{key}</label>
+                      <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block font-mono">{key}</label>
                       <button
                         type="button"
                         onClick={() => {
@@ -1257,7 +1244,7 @@ export default function CADSidebar({
                         updated[key] = e.target.value;
                         onUpdateAssetSpecs(selectedAsset.id, updated, selectedAsset.name, selectedAsset.rotationY, selectedAsset.assignedRoomId);
                       }}
-                      className="w-full bg-slate-55 border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-850 focus:outline-none focus:border-cyan-500 font-mono"
+                      className="w-full bg-slate-55 border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-900 focus:outline-none focus:border-cyan-500 font-mono"
                     />
                   </div>
                 );
@@ -1267,7 +1254,7 @@ export default function CADSidebar({
               <div className="mt-3 bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono flex items-center gap-1">
-                    <Hammer className="w-3.5 h-3.5 text-cyan-600" /> Parametric BIM Actions
+                    <Hammer className="w-3.5 h-3.5 text-cyan-600" /> Spec shortcuts
                   </span>
                 </div>
 
@@ -1281,20 +1268,20 @@ export default function CADSidebar({
                       updated['Cost'] = selectedAsset.category === 'furniture' ? '$450.00' : '$850.00';
                       updated['Weight'] = selectedAsset.category === 'furniture' ? '12.5 kg' : '1.2 kg';
                       updated['Power Needs'] = selectedAsset.category === 'furniture' ? 'None' : 'PoE+ (15.4W)';
-                      updated['Install Date'] = '11-June-2026';
+                      updated['Install Date'] = new Date().toISOString().slice(0, 10);
                       updated['Asset Tag'] = `BIM-F-${selectedAsset.id.toUpperCase()}`;
 
                       onUpdateAssetSpecs(selectedAsset.id, updated, selectedAsset.name, selectedAsset.rotationY, selectedAsset.assignedRoomId);
 
                       const toast = document.createElement('div');
-                      toast.className = "fixed bottom-14 right-5 bg-cyan-600 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl z-50 flex items-center gap-1.5 animate-in slide-in-from-bottom-4 duration-300";
-                      toast.innerHTML = `<span>Populated parametric spec values matching Steelcase/Aruba standard benchmarks!</span>`;
+                      toast.className = "fixed bottom-14 right-5 bg-cyan-600 text-white text-xs font-semibold px-4 py-3 rounded-xl  z-50 flex items-center gap-1.5 animate-in slide-in-from-bottom-4 duration-300";
+                      toast.innerHTML = `<span>Filled in typical specs. Replace them with your supplier's values.</span>`;
                       document.body.appendChild(toast);
                       setTimeout(() => toast.remove(), 3500);
                     }}
                     className="w-full bg-cyan-600 hover:bg-cyan-700 text-white text-[10.5px] font-bold py-1 px-2.5 rounded-lg transition-all text-center cursor-pointer shadow-3xs"
                   >
-                    Load Standard BIM Specs
+                    Fill typical specs
                   </button>
                 </div>
 
@@ -1326,7 +1313,7 @@ export default function CADSidebar({
               </div>
             </div>
             
-            <div className="text-[9px] text-slate-400 font-mono border-t border-slate-100 pt-2 flex justify-between pr-1">
+            <div className="text-[9px] text-slate-500 font-mono border-t border-slate-100 pt-2 flex justify-between pr-1">
               <span>COORDINATE MAP:</span>
               <span className="font-bold text-slate-500">X: {selectedAsset.position.x.toFixed(2)}m, Z: {selectedAsset.position.z.toFixed(2)}m</span>
             </div>
@@ -1338,7 +1325,7 @@ export default function CADSidebar({
                 return (
                   <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-[10px] font-medium flex flex-col gap-1 mt-1">
                     <div className="font-bold flex items-center gap-1.5 font-mono uppercase tracking-wider text-[9px] text-rose-600">
-                      <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse inline-block" />
+                      <span className="w-1.5 h-1.5 bg-rose-500 rounded-full inline-block" />
                       Placement Conflict Alert
                     </div>
                     {isOutside && <div className="leading-tight">• Selected asset is placed outside defined room boundaries</div>}
@@ -1350,8 +1337,8 @@ export default function CADSidebar({
             })()}
           </div>
         ) : (
-          <div className="py-4 text-center text-slate-400 text-xs italic font-sans flex flex-col items-center justify-center gap-1.5" id="inspector-placeholder">
-            <SlidersHorizontal className="w-5 h-5 text-slate-350 animate-pulse" />
+          <div className="py-4 text-center text-slate-500 text-xs italic font-sans flex flex-col items-center justify-center gap-1.5" id="inspector-placeholder">
+            <SlidersHorizontal className="w-5 h-5 text-slate-500" />
             <span className="max-w-[260px] leading-relaxed">Select an Access Point, CCTV camera, or office equipment inside the 3D grid layout to inspector-edit serial nodes.</span>
           </div>
         )}

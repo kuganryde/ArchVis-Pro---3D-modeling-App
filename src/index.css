@@ -1,9 +1,59 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
+/*
+ * Design tokens.
+ * Type: display (Bricolage Grotesque) for headings and the wordmark, IBM Plex Sans for the
+ * interface, IBM Plex Mono for dimensions, IDs and readouts.
+ * Colour: drafting-table neutrals (a teal-tinted grey ramp that replaces Tailwind slate) and one
+ * accent, deep teal, replacing Tailwind cyan. Every accent shade from 600 up passes WCAG AA as
+ * text on white, and white text passes AA on accent-600 and darker, which the default cyan did not.
+ */
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-display: "Bricolage Grotesque Variable", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --color-slate-50: #f5f7f6;
+  --color-slate-100: #ebefee;
+  --color-slate-200: #dbe2e0;
+  --color-slate-300: #c3ccca;
+  --color-slate-350: #acb8b5;
+  --color-slate-400: #8d9996;
+  --color-slate-500: #5f6b68;
+  --color-slate-600: #4a5553;
+  --color-slate-700: #38413f;
+  --color-slate-800: #252c2b;
+  --color-slate-900: #151b1a;
+  --color-slate-950: #0b0f0f;
+
+  --color-cyan-50: #e9f5f6;
+  --color-cyan-100: #d0eaec;
+  --color-cyan-200: #a8d5d9;
+  --color-cyan-300: #76b9bf;
+  --color-cyan-400: #409aa3;
+  --color-cyan-500: #1f7f8a;
+  --color-cyan-600: #146974;
+  --color-cyan-700: #0f545d;
+  --color-cyan-800: #0b434a;
+  --color-cyan-900: #08343a;
+}
+
+@layer base {
+  h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.015em; }
+  /* Visible keyboard focus everywhere, not only on the custom buttons. */
+  :focus-visible { outline: 2px solid var(--color-cyan-500); outline-offset: 2px; }
+  /* Numbers that line up in columns and readouts. */
+  table, output, [data-numeric] { font-variant-numeric: tabular-nums; }
+}
+
+/* Respect the reduced-motion setting: no pulsing, spinning or sliding. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Custom scrollbars for a clean dark CAD sidebar interface */
@@ -23,9 +73,9 @@
 }
 
 /* -------------------------------------------------------------------------
-   Pill buttons — rounded, elevated, with a springy hover-lift / press feel.
-   Base = shape + motion; the -primary / -secondary / -danger variants add
-   colour + elevation. Sizes: default, plus .av-btn-sm.
+   Buttons: flat, squared and precise. Base = shape + focus + press; the
+   -primary / -secondary / -danger variants add colour. Sizes: default and
+   .av-btn-sm. No glow, no lift: state is shown by colour and a 1px border.
    ------------------------------------------------------------------------- */
 @layer components {
   .av-btn {
@@ -33,80 +83,63 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1;
-    border-radius: 9999px;
+    border-radius: 0.5rem;
     border: 1px solid transparent;
     cursor: pointer;
     white-space: nowrap;
     user-select: none;
     -webkit-user-select: none;
-    transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
-      box-shadow 0.18s ease, background-color 0.18s ease, color 0.18s ease;
-  }
-  .av-btn:focus-visible {
-    outline: 2px solid #22d3ee;
-    outline-offset: 2px;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   }
   .av-btn:disabled {
-    opacity: 0.55;
+    opacity: 0.5;
     cursor: not-allowed;
-    transform: none !important;
   }
-  .av-btn:active {
-    transform: translateY(1px) scale(0.99);
+  .av-btn:active:not(:disabled) {
+    transform: scale(0.99);
   }
 
-  /* Primary — brand cyan→teal gradient, elevated with a neon cyan glow. */
+  /* Primary: the one accent colour, flat. */
   .av-btn-primary {
-    padding: 0.7rem 1.4rem;
+    padding: 0.7rem 1.3rem;
     color: #fff;
-    background-image: linear-gradient(180deg, #22d3ee, #0891b2);
-    box-shadow: 0 10px 20px -6px rgba(8, 145, 178, 0.55),
-      0 3px 6px -2px rgba(8, 145, 178, 0.4);
+    background: var(--color-cyan-600);
+    border-color: var(--color-cyan-700);
   }
-  .av-btn-primary:hover {
-    transform: translateY(-2px);
-    background-image: linear-gradient(180deg, #06b6d4, #0e7490);
-    box-shadow: 0 18px 30px -8px rgba(8, 145, 178, 0.6),
-      0 6px 12px -3px rgba(8, 145, 178, 0.45);
-  }
-  .av-btn-primary:active {
-    box-shadow: 0 6px 12px -4px rgba(8, 145, 178, 0.5);
+  .av-btn-primary:hover:not(:disabled) {
+    background: var(--color-cyan-700);
   }
 
-  /* Secondary — clean white pill with a soft lift. */
+  /* Secondary: white with a structural border. */
   .av-btn-secondary {
-    padding: 0.6rem 1.2rem;
-    color: #334155;
+    padding: 0.6rem 1.1rem;
+    color: var(--color-slate-700);
     background: #fff;
-    border-color: #e2e8f0;
-    box-shadow: 0 4px 10px -4px rgba(15, 23, 42, 0.12);
+    border-color: var(--color-slate-300);
   }
-  .av-btn-secondary:hover {
-    transform: translateY(-2px);
-    background: #f8fafc;
-    box-shadow: 0 10px 18px -6px rgba(15, 23, 42, 0.18);
+  .av-btn-secondary:hover:not(:disabled) {
+    background: var(--color-slate-100);
+    border-color: var(--color-slate-350);
   }
 
-  /* Danger — subtle rose pill for destructive actions. */
+  /* Danger: for destructive actions. */
   .av-btn-danger {
-    padding: 0.6rem 1.2rem;
-    color: #e11d48;
+    padding: 0.6rem 1.1rem;
+    color: #b4172f;
     background: #fff;
-    border-color: #fecdd3;
-    box-shadow: 0 4px 10px -4px rgba(225, 29, 72, 0.15);
+    border-color: #f0b4bf;
   }
-  .av-btn-danger:hover {
-    transform: translateY(-2px);
-    color: #be123c;
-    background: #fff1f2;
-    box-shadow: 0 10px 18px -6px rgba(225, 29, 72, 0.22);
+  .av-btn-danger:hover:not(:disabled) {
+    color: #8f1226;
+    background: #fff1f3;
+    border-color: #e58a9a;
   }
 
   .av-btn-sm {
-    padding: 0.42rem 0.95rem;
-    font-size: 0.72rem;
+    padding: 0.45rem 0.85rem;
+    font-size: 0.75rem;
   }
 }
 

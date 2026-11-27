@@ -15,7 +15,7 @@ export default function IsoThumb({ type, category }: { type: string; category: '
         className={`p-2 rounded-lg transition-all ${
           category === 'infrastructure'
             ? 'bg-cyan-50 text-cyan-600 group-hover:bg-cyan-100'
-            : 'bg-orange-50 text-orange-650 group-hover:bg-orange-100'
+            : 'bg-orange-50 text-orange-700 group-hover:bg-orange-100'
         }`}
       >
         {category === 'infrastructure' ? <Cpu className="w-4 h-4" /> : <Layout className="w-4 h-4" />}

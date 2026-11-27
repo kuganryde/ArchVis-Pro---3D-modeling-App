@@ -52,7 +52,7 @@ export default function BillingModal({ workspaceId, currentPlan, onClose }: Bill
 
   return (
     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white max-w-3xl w-full rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+      <div className="bg-white max-w-3xl w-full rounded-2xl  border border-slate-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-600 flex items-center justify-center shadow-inner">
@@ -65,7 +65,7 @@ export default function BillingModal({ workspaceId, currentPlan, onClose }: Bill
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-all">
+          <button onClick={onClose} className="p-2 text-slate-500 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-all">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -131,7 +131,7 @@ export default function BillingModal({ workspaceId, currentPlan, onClose }: Bill
 
                     {isCurrent ? (
                       p.id === 'free' ? (
-                        <div className="text-center text-[11px] font-semibold text-slate-400 py-2">
+                        <div className="text-center text-[11px] font-semibold text-slate-500 py-2">
                           Current plan
                         </div>
                       ) : (
@@ -154,7 +154,7 @@ export default function BillingModal({ workspaceId, currentPlan, onClose }: Bill
                         Upgrade to {p.name}
                       </button>
                     ) : (
-                      <div className="text-center text-[11px] font-semibold text-slate-400 py-2">
+                      <div className="text-center text-[11px] font-semibold text-slate-500 py-2">
                         {p.id === 'free' ? '—' : 'Not available'}
                       </div>
                     )}

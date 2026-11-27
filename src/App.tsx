@@ -53,7 +53,10 @@ import {
   Undo2,
   Redo2,
   Home as HomeIcon,
-  Lightbulb
+  Lightbulb,
+  SlidersHorizontal,
+  ChevronDown,
+  X
 } from 'lucide-react';
 
 // Google Analytics measurement ID, configured via the VITE_GA_MEASUREMENT_ID
@@ -156,6 +159,8 @@ export default function App({
   const [lightingMode, setLightingMode] = useState<LightingMode>('day');
   const [cutawayWalls, setCutawayWalls] = useState(false);
   const [showRelight, setShowRelight] = useState(false);
+  const [showTools, setShowTools] = useState(false);
+  const toolsRef = useRef<HTMLDivElement>(null);
   const [relightFixtures, setRelightFixtures] = useState<'downlights' | 'pendants' | 'sconces' | 'mixed'>('mixed');
   const [relightColour, setRelightColour] = useState<'warm' | 'neutral' | 'cool'>('warm');
   const [focusKey, setFocusKey] = useState(0);
@@ -206,7 +211,15 @@ export default function App({
   const [showCablingPaths, setShowCablingPaths] = useState(false);
 
   // Interactive help tour state
-  const [showTutorial, setShowTutorial] = useState(true);
+  // The welcome card shows on every visit until the user ticks "Don't show this again".
+  const [showTutorial, setShowTutorial] = useState<boolean>(() => {
+    try { return localStorage.getItem('archviz_welcome_dismissed') !== '1'; } catch { return true; }
+  });
+  const [welcomeDismissForever, setWelcomeDismissForever] = useState(false);
+  const closeWelcome = () => {
+    if (welcomeDismissForever) { try { localStorage.setItem('archviz_welcome_dismissed', '1'); } catch { /* storage unavailable */ } }
+    setShowTutorial(false);
+  };
 
   // Legal Center (footer links) — holds the active policy tab or null.
   const [legalTab, setLegalTab] = useState<string | null>(null);
@@ -228,7 +241,7 @@ export default function App({
   const nextAssetIdNumberRef = React.useRef(99);
 
   // Instantiate assets dynamically at standard focus points
-  const handleAddAsset = (type: string) => {
+  const handleAddAsset = (type: string, at?: { x: number; z: number; roomId?: string }) => {
     nextAssetIdNumberRef.current += 1;
     const uid = makeId(type);
 
@@ -373,7 +386,8 @@ export default function App({
       type: type as any,
       category,
       name: label,
-      position: { x: 0, y: height, z: 0 }, // Instantiate at floor center
+      position: { x: at?.x ?? 0, y: height, z: at?.z ?? 0 }, // at the requested spot, else the floor centre
+      assignedRoomId: at?.roomId,
       rotationY: 0,
       scale: type === 'desk_cluster_6' ? { x: 2.2, y: 0.75, z: 1.4 } : { x: 1, y: 1, z: 1 },
       specs: defaultSpecs
@@ -511,7 +525,7 @@ export default function App({
       showToast(
         `Digital Twin layout of ${mappedRooms.length} rooms and ${mappedAssets.length} nodes synthesized successfully.`,
         'success',
-        { title: '✨ Blueprint digitized' }
+        { title: 'Blueprint digitized' }
       );
     } catch (error: any) {
       console.error('Error digitizing blueprint:', error);
@@ -528,7 +542,7 @@ export default function App({
         error.message ||
           'Gemini is currently experiencing high demand. Trying again in a few moments usually resolves this.',
         'error',
-        { title: '⚠️ AI Digitizer issue', durationMs: 6000 }
+        { title: 'AI digitizer issue', durationMs: 6000 }
       );
     } finally {
       setIsDigitizing(false);
@@ -685,12 +699,15 @@ export default function App({
   };
 
   /** Swap the lighting scheme of the whole house (every floor) without moving any furniture. One undo step. */
+  // Tools menu and relight panel: Escape or a click elsewhere closes them.
   useEffect(() => {
-    if (!showRelight) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowRelight(false); };
+    if (!showRelight && !showTools) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setShowRelight(false); setShowTools(false); } };
+    const onDown = (e: MouseEvent) => { if (toolsRef.current && !toolsRef.current.contains(e.target as Node)) { setShowRelight(false); setShowTools(false); } };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [showRelight]);
+    window.addEventListener('mousedown', onDown);
+    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('mousedown', onDown); };
+  }, [showRelight, showTools]);
 
   const handleRelight = () => {
     const uid = `rl${Date.now().toString(36)}`;
@@ -885,76 +902,59 @@ export default function App({
     <div className="flex flex-col h-screen w-screen bg-slate-50 text-slate-800 font-sans overflow-hidden" id="main-applet-root">
       
       {/* 1. Bento Header Navigation */}
-      <nav className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 shadow-xs">
+      <nav className="h-16 bg-white border-b border-slate-200 flex items-center justify-between gap-4 px-4 xl:px-6 shrink-0" aria-label="Workspace toolbar">
         <div className="flex items-center gap-3 min-w-0">
-          <Logo size={38} />
-          <Wordmark className="text-lg" />
-          <div className="h-6 w-px bg-slate-200 mx-4"></div>
+          <Logo size={34} />
+          <Wordmark className="text-base shrink-0 whitespace-nowrap" />
+          <div className="h-6 w-px bg-slate-200 mx-2 hidden xl:block" aria-hidden="true"></div>
           {headerSlot ? (
             headerSlot
           ) : (
-            <span className="text-sm text-slate-500 font-medium hidden sm:inline truncate max-w-[16rem] xl:max-w-[24rem]" title={`Project: HQ West Wing - ${activeLevel.name}`}>Project: HQ West Wing - {activeLevel.name}</span>
+            <span className="text-sm text-slate-500 font-medium hidden xl:inline truncate max-w-[14rem]" title="Saved in this browser">
+              {doc.rooms.some((r) => r.kind) ? 'House project' : 'Local project'} · {activeLevel.name}
+            </span>
           )}
         </div>
 
         <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
           {/* Undo / redo */}
-          <div className="flex items-center gap-1 mr-1" role="group" aria-label="History">
-            <button
-              type="button"
-              onClick={handleUndo}
-              disabled={!canUndo}
-              aria-label="Undo"
-              title="Undo (Ctrl/Cmd+Z)"
-              className="av-btn av-btn-secondary av-btn-sm disabled:opacity-40 disabled:cursor-not-allowed"
-            >
+          <div className="flex items-center gap-1" role="group" aria-label="History">
+            <button type="button" onClick={handleUndo} disabled={!canUndo} aria-label="Undo" title="Undo (Ctrl/Cmd+Z)" className="av-btn av-btn-secondary av-btn-sm">
               <Undo2 className="w-3.5 h-3.5" />
             </button>
-            <button
-              type="button"
-              onClick={handleRedo}
-              disabled={!canRedo}
-              aria-label="Redo"
-              title="Redo (Ctrl/Cmd+Shift+Z)"
-              className="av-btn av-btn-secondary av-btn-sm disabled:opacity-40 disabled:cursor-not-allowed"
-            >
+            <button type="button" onClick={handleRedo} disabled={!canRedo} aria-label="Redo" title="Redo (Ctrl/Cmd+Shift+Z)" className="av-btn av-btn-secondary av-btn-sm">
               <Redo2 className="w-3.5 h-3.5" />
             </button>
           </div>
           <span className="sr-only" role="status" aria-live="polite">{historyNotice}</span>
 
-          {/* Quick 2D/3D View Selector */}
-          <div className="flex bg-slate-100 p-1 rounded-lg mr-2" id="header-viewMode-selector">
-            <button
-              type="button"
-              onClick={() => setViewMode('3D')}
-              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                viewMode === '3D' ? 'bg-white shadow-sm text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              3D View
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('2D')}
-              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                viewMode === '2D' ? 'bg-white shadow-sm text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              2D Plan
-            </button>
+          {/* View: 3D model or 2D plan */}
+          <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200" role="group" aria-label="View" id="header-viewMode-selector">
+            {(['3D', '2D'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                aria-pressed={viewMode === m}
+                onClick={() => setViewMode(m)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                  viewMode === m ? 'bg-white border border-slate-200 text-slate-900' : 'border border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {m === '3D' ? '3D View' : '2D Plan'}
+              </button>
+            ))}
           </div>
 
-          {/* Time-of-day lighting preview (evening and night switch the house lights on) */}
-          <div className="flex bg-slate-100 p-1 rounded-lg mr-2" role="group" aria-label="Lighting preview" id="header-lighting-selector">
+          {/* Light: time of day (evening and night switch the house lights on) and cutaway walls */}
+          <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200" role="group" aria-label="Lighting preview" id="header-lighting-selector">
             {(Object.keys(LIGHTING_PRESETS) as LightingMode[]).map((m) => (
               <button
                 key={m}
                 type="button"
                 aria-pressed={lightingMode === m}
                 onClick={() => setLightingMode(m)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                  lightingMode === m ? 'bg-white shadow-sm text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-900'
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                  lightingMode === m ? 'bg-white border border-slate-200 text-slate-900' : 'border border-transparent text-slate-600 hover:text-slate-900'
                 }`}
                 title={`${LIGHTING_PRESETS[m].label} lighting preview`}
               >
@@ -965,8 +965,8 @@ export default function App({
               type="button"
               aria-pressed={cutawayWalls}
               onClick={() => setCutawayWalls((v) => !v)}
-              className={`ml-1 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                cutawayWalls ? 'bg-white shadow-sm text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-900'
+              className={`ml-0.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                cutawayWalls ? 'bg-white border border-slate-200 text-slate-900' : 'border border-transparent text-slate-600 hover:text-slate-900'
               }`}
               title="Cut the house walls down to waist height to see inside"
             >
@@ -974,23 +974,74 @@ export default function App({
             </button>
           </div>
 
-          {/* Re-light the whole house: fixture style and light colour, furniture untouched */}
-          <div className="relative mr-2">
+          {/* Tools: overlays, relighting, AI key and reset */}
+          <div className="relative" ref={toolsRef}>
             <button
               type="button"
-              id="open-relight"
-              aria-expanded={showRelight}
-              aria-controls="relight-panel"
-              disabled={!doc.rooms.some((r) => r.kind)}
-              onClick={() => setShowRelight((v) => !v)}
-              className="av-btn av-btn-secondary av-btn-sm disabled:opacity-40 disabled:cursor-not-allowed"
-              title={doc.rooms.some((r) => r.kind) ? 'Change the lighting scheme of the house' : 'Generate a house with the House Designer first'}
+              id="open-tools"
+              aria-haspopup="menu"
+              aria-expanded={showTools}
+              aria-controls="tools-menu"
+              onClick={() => setShowTools((v) => !v)}
+              className="av-btn av-btn-secondary av-btn-sm"
             >
-              <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-              <span className="hidden xl:inline">Relight</span>
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>Tools</span>
+              {!geminiApiKey && !hostedAiWorkspaceId && <span className="w-1.5 h-1.5 rounded-full bg-amber-500" aria-label="AI key not set" />}
+              <ChevronDown className="w-3 h-3" />
             </button>
+            {showTools && (
+              <div id="tools-menu" role="menu" aria-label="Tools" className="absolute right-0 top-full mt-2 w-72 z-50 bg-white border border-slate-200 rounded-xl p-1.5">
+                <button
+                  type="button"
+                  role="menuitemcheckbox"
+                  aria-checked={showOccupancyHeatmap}
+                  onClick={() => {
+                    const next = !showOccupancyHeatmap;
+                    setShowOccupancyHeatmap(next);
+                    if (next && viewMode !== '2D') setViewMode('2D');
+                    setShowTools(false);
+                  }}
+                  className="w-full flex items-start gap-3 px-3 py-2 rounded-lg text-left hover:bg-slate-100"
+                >
+                  <Sparkles className="w-4 h-4 mt-0.5 text-cyan-600 shrink-0" />
+                  <span><span className="block text-sm font-semibold text-slate-800">Heatmap overlay{showOccupancyHeatmap ? ' (on)' : ''}</span><span className="block text-xs text-slate-500">Colour each room by how full it is</span></span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  id="open-relight"
+                  disabled={!doc.rooms.some((r) => r.kind)}
+                  onClick={() => { setShowTools(false); setShowRelight(true); }}
+                  className="w-full flex items-start gap-3 px-3 py-2 rounded-lg text-left hover:bg-slate-100 disabled:opacity-50 disabled:hover:bg-transparent"
+                >
+                  <Lightbulb className="w-4 h-4 mt-0.5 text-cyan-600 shrink-0" />
+                  <span><span className="block text-sm font-semibold text-slate-800">Relight house…</span><span className="block text-xs text-slate-500">{doc.rooms.some((r) => r.kind) ? 'Change fixtures and light colour' : 'Generate a house with the House Designer first'}</span></span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setShowTools(false); setShowApiKeyModal(true); }}
+                  className="w-full flex items-start gap-3 px-3 py-2 rounded-lg text-left hover:bg-slate-100"
+                >
+                  <Key className="w-4 h-4 mt-0.5 text-cyan-600 shrink-0" />
+                  <span><span className="block text-sm font-semibold text-slate-800">{geminiApiKey ? 'Gemini key active' : hostedAiWorkspaceId ? 'AI through your plan' : 'Add a Gemini key'}</span><span className="block text-xs text-slate-500">{geminiApiKey || hostedAiWorkspaceId ? 'Used for blueprint scanning and AI requests' : 'Needed for blueprint scanning and Read with AI'}</span></span>
+                </button>
+                <div className="my-1 border-t border-slate-100" role="separator" />
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setShowTools(false); handleResetCanvas(); }}
+                  className="w-full flex items-start gap-3 px-3 py-2 rounded-lg text-left hover:bg-rose-50"
+                >
+                  <RefreshCw className="w-4 h-4 mt-0.5 text-rose-700 shrink-0" />
+                  <span><span className="block text-sm font-semibold text-rose-800">Reset workspace</span><span className="block text-xs text-slate-500">Clear every floor. You can undo it.</span></span>
+                </button>
+              </div>
+            )}
             {showRelight && (
-              <div id="relight-panel" role="dialog" aria-label="Relight the house" className="absolute right-0 top-full mt-2 w-64 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-3 space-y-3">
+              <div id="relight-panel" role="dialog" aria-label="Relight the house" className="absolute right-0 top-full mt-2 w-72 z-50 bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <h2 className="text-sm font-bold text-slate-900">Relight the house</h2>
                 <div>
                   <label htmlFor="relight-fixtures" className="text-xs font-semibold text-slate-700">Fixtures</label>
                   <select id="relight-fixtures" value={relightFixtures} onChange={(e) => setRelightFixtures(e.target.value as typeof relightFixtures)} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs">
@@ -1008,7 +1059,7 @@ export default function App({
                     <option value="cool">Cool daylight (4500 K)</option>
                   </select>
                 </div>
-                <p className="text-[11px] text-slate-500">Replaces every ceiling light, pendant, downlight and sconce. Furniture and floor lamps stay where they are.</p>
+                <p className="text-xs text-slate-500">Replaces every ceiling light, pendant, downlight and sconce. Furniture and floor lamps stay where they are.</p>
                 <div className="flex justify-end gap-2">
                   <button type="button" onClick={() => setShowRelight(false)} className="av-btn av-btn-secondary av-btn-sm">Cancel</button>
                   <button type="button" onClick={handleRelight} className="av-btn av-btn-primary av-btn-sm">Apply lighting</button>
@@ -1017,63 +1068,13 @@ export default function App({
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              const nextState = !showOccupancyHeatmap;
-              setShowOccupancyHeatmap(nextState);
-              if (nextState && viewMode !== '2D') {
-                setViewMode('2D');
-              }
-            }}
-            className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all border flex items-center gap-1.5 cursor-pointer focus:outline-none ${
-              showOccupancyHeatmap
-                ? 'bg-emerald-600 border-emerald-600 text-white font-bold hover:bg-emerald-700 shadow-sm'
-                : 'bg-white/95 border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-50 shadow-sm'
-            }`}
-            title="Toggle colorized room occupancy load heat map overlay"
-          >
-            <Sparkles className={`w-3.5 h-3.5 ${showOccupancyHeatmap ? 'animate-spin' : ''}`} style={{ animationDuration: '4s' }} />
-            <span>Heatmap Overlay</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleResetCanvas}
-            className="av-btn av-btn-danger av-btn-sm"
-            title="Reset Workspace"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Reset Workspace</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowApiKeyModal(true)}
-            className={`av-btn av-btn-secondary av-btn-sm ${geminiApiKey ? '' : 'animate-pulse'}`}
-            title="Configure Gemini API Key"
-          >
-            <Key className={`w-3.5 h-3.5 ${geminiApiKey ? 'text-cyan-600' : 'text-amber-600'}`} />
-            <span className="hidden xl:inline">{geminiApiKey ? 'API Key Active' : 'Set API Key'}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowHouseDesigner(true)}
-            className="av-btn av-btn-secondary av-btn-sm"
-            title="Generate a whole house with layout, interior design and lighting"
-            id="open-house-designer"
-          >
+          <button type="button" onClick={() => setShowHouseDesigner(true)} className="av-btn av-btn-secondary av-btn-sm" title="Generate a whole house: layout, finishes, furniture and lighting" id="open-house-designer">
             <HomeIcon className="w-3.5 h-3.5 text-cyan-600" />
-            <span className="hidden lg:inline">House Designer</span>
+            <span>House Designer</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setShowShareModal(true)}
-            className="av-btn av-btn-primary av-btn-sm"
-          >
-            <Share2 className="w-4 h-4" />
+          <button type="button" onClick={() => setShowShareModal(true)} className="av-btn av-btn-primary av-btn-sm">
+            <Share2 className="w-3.5 h-3.5" />
             <span>Share & Export</span>
           </button>
         </div>
@@ -1090,9 +1091,9 @@ export default function App({
             className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${
               activeTab === 'library' 
                 ? 'bg-cyan-50 text-cyan-600 border border-cyan-100 font-bold' 
-                : 'hover:bg-slate-100 text-slate-400 hover:text-slate-600'
+                : 'hover:bg-slate-100 text-slate-500 hover:text-slate-600'
             }`}
-            title="Procurement Library"
+            title="Library: items to place"
           >
             <Cpu className="w-5 h-5" />
           </button>
@@ -1103,9 +1104,9 @@ export default function App({
             className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${
               activeTab === 'rooms' 
                 ? 'bg-cyan-50 text-cyan-600 border border-cyan-100 font-bold' 
-                : 'hover:bg-slate-100 text-slate-400 hover:text-slate-600'
+                : 'hover:bg-slate-100 text-slate-500 hover:text-slate-600'
             }`}
-            title="Modular Rooms"
+            title="Rooms and blueprint"
           >
             <Layout className="w-5 h-5" />
           </button>
@@ -1116,9 +1117,9 @@ export default function App({
             className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${
               activeTab === 'reports' 
                 ? 'bg-cyan-50 text-cyan-600 border border-cyan-100 font-bold' 
-                : 'hover:bg-slate-100 text-slate-400 hover:text-slate-600'
+                : 'hover:bg-slate-100 text-slate-500 hover:text-slate-600'
             }`}
-            title="Dynamic Inventory"
+            title="Inventory and bill of materials"
           >
             <FileSpreadsheet className="w-5 h-5" />
           </button>
@@ -1129,7 +1130,7 @@ export default function App({
           <button
             type="button"
             onClick={() => setShowTutorial(true)}
-            className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400 mb-2 transition-all"
+            className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-500 mb-2 transition-all"
             title="User Onboarding Guide"
           >
             <HelpCircle className="w-5 h-5" />
@@ -1227,45 +1228,52 @@ export default function App({
           />
         </div>
 
-        {/* Interactive instructional tutorial walkthrough overlay */}
+        {/* Welcome: what the app does and three ways to start */}
         {showTutorial && (
-          <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in" id="tutorial-overlay-backplane">
-            <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden p-6 flex flex-col gap-4">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-cyan-50 text-cyan-600">
-                  <Sparkles className="w-5 h-5 animate-pulse" />
-                </div>
+          <div className="absolute inset-0 bg-slate-950/45 z-50 flex items-center justify-center p-4" id="tutorial-overlay-backplane">
+            <div role="dialog" aria-modal="true" aria-labelledby="welcome-title" className="max-w-lg w-full bg-white rounded-2xl border border-slate-200 overflow-hidden p-6 flex flex-col gap-5">
+              <div className="flex items-start gap-3">
+                <Logo size={40} />
                 <div>
-                  <h2 className="text-base font-bold text-slate-800">Office 3D Digital Twin Planner</h2>
-                  <p className="text-xs text-slate-500 font-mono">Bento Grid Architectural Hub</p>
+                  <h2 id="welcome-title" className="text-xl font-bold text-slate-900 leading-tight">Plan offices and homes in 3D</h2>
+                  <p className="text-sm text-slate-600 mt-1">Lay out rooms, furniture, Wi-Fi, cameras and lighting in one model, then export the plan.</p>
                 </div>
               </div>
 
-              <div className="space-y-3 text-xs text-slate-600 leading-normal border-y border-slate-100 py-4">
-                <div className="flex gap-2">
-                  <span className="w-5 h-5 rounded-full bg-cyan-50 text-cyan-600 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
-                  <p><b>Bright, Immersive Navigation:</b> Zoom, pan, and rotate using the mouse. Toggle <b>2D</b> blueprint view or <b>3D</b> extruded architectural layers using the navigation controls.</p>
-                </div>
-                <div className="flex gap-2">
-                  <span className="w-5 h-5 rounded-full bg-cyan-50 text-cyan-600 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
-                  <p><b>Mouse Drag Operations:</b> Select any equipment node (APs, CCTV cones, network outlets) by clicking directly. Left-click & drag any item to shift coordinates in space.</p>
-                </div>
-                <div className="flex gap-2">
-                  <span className="w-5 h-5 rounded-full bg-cyan-50 text-cyan-600 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
-                  <p><b>Share & Export integration:</b> Export your schematic to PDF/Image formats, save as local JSON, or copy the direct HTML embed snippets to plug into your own site securely.</p>
-                </div>
-              </div>
+              <ol className="space-y-3.5 text-sm text-slate-700 border-y border-slate-100 py-4">
+                <li className="flex gap-3">
+                  <span className="w-6 h-6 rounded-md bg-cyan-50 text-cyan-700 text-xs font-bold flex items-center justify-center shrink-0 font-mono">1</span>
+                  <p><b className="text-slate-900">Start from a blueprint or a description.</b> Upload a floor plan and AI turns it into rooms and furniture, or open House Designer and describe the home you want.</p>
+                </li>
+                <li className="flex gap-3">
+                  <span className="w-6 h-6 rounded-md bg-cyan-50 text-cyan-700 text-xs font-bold flex items-center justify-center shrink-0 font-mono">2</span>
+                  <p><b className="text-slate-900">Edit in 3D or on the 2D plan.</b> Drag with the left mouse button to orbit, scroll to zoom, click an item to select it and drag it into place. Items that overlap or sit outside a room turn red.</p>
+                </li>
+                <li className="flex gap-3">
+                  <span className="w-6 h-6 rounded-md bg-cyan-50 text-cyan-700 text-xs font-bold flex items-center justify-center shrink-0 font-mono">3</span>
+                  <p><b className="text-slate-900">Check it, then share it.</b> Preview Day, Evening and Night light, check Wi-Fi coverage and room load, then export a PDF report, bill of materials, CSV or JSON.</p>
+                </li>
+              </ol>
 
-              <div className="flex justify-between items-center pt-1">
-                <span className="text-[10px] text-slate-400 font-mono">Matched to source blueprint image</span>
-                <button
-                  type="button"
-                  onClick={() => setShowTutorial(false)}
-                  className="av-btn av-btn-primary av-btn-sm"
-                >
-                  <span>Launch CAD Workspace</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                  <input type="checkbox" checked={welcomeDismissForever} onChange={(e) => setWelcomeDismissForever(e.target.checked)} />
+                  Don't show this again
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { closeWelcome(); setShowHouseDesigner(true); }}
+                    className="av-btn av-btn-secondary av-btn-sm"
+                  >
+                    <HomeIcon className="w-3.5 h-3.5 text-cyan-600" />
+                    <span>Design a house</span>
+                  </button>
+                  <button type="button" onClick={closeWelcome} className="av-btn av-btn-primary av-btn-sm" autoFocus>
+                    <span>Open workspace</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1275,7 +1283,7 @@ export default function App({
       {/* BYOK API Key Modal Component */}
       {showApiKeyModal && (
         <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white max-w-lg w-full rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+          <div className="bg-white max-w-lg w-full rounded-2xl  border border-slate-200 flex flex-col overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3 bg-slate-50">
               <div className="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-600 flex items-center justify-center shadow-inner">
                 <Key className="w-5 h-5" />
@@ -1317,7 +1325,7 @@ export default function App({
                       }
                     }}
                   />
-                  <Key className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
+                  <Key className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-500" />
                 </div>
                 <p className="text-[11px] text-slate-500 ml-1">Get your free key from <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-cyan-500 hover:underline">Google AI Studio</a>.</p>
               </div>
@@ -1360,7 +1368,7 @@ export default function App({
       {/* Share / Export Modal Component */}
       {showShareModal && (
         <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white max-w-2xl w-full rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+          <div className="bg-white max-w-2xl w-full rounded-2xl  border border-slate-200 flex flex-col overflow-hidden">
             <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-600 flex items-center justify-center shadow-inner">
@@ -1368,14 +1376,16 @@ export default function App({
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-slate-800">Share & Export</h2>
-                  <p className="text-xs text-slate-500 font-medium">Export your 3D digital twin to various formats or copy integration code.</p>
+                  <p className="text-xs text-slate-500 font-medium">Download a report or image, or copy the design as JSON.</p>
                 </div>
               </div>
-              <button 
+              <button
+                type="button"
                 onClick={() => setShowShareModal(false)}
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-all"
+                aria-label="Close Share & Export"
+                className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
@@ -1397,7 +1407,7 @@ export default function App({
                       <div className="text-[10px] text-slate-500">Copy full layout to clipboard</div>
                     </div>
                   </div>
-                  <Copy className="w-4 h-4 text-slate-400 group-hover:text-cyan-500" />
+                  <Copy className="w-4 h-4 text-slate-500 group-hover:text-cyan-500" />
                 </button>
 
                 <button
@@ -1413,10 +1423,10 @@ export default function App({
                       <div className="text-[10px] text-slate-500">Reimportable schematic backup</div>
                     </div>
                   </div>
-                  <Download className="w-4 h-4 text-slate-400 group-hover:text-cyan-500" />
+                  <Download className="w-4 h-4 text-slate-500 group-hover:text-cyan-500" />
                 </button>
 
-                <div className="text-[10px] text-slate-400 leading-relaxed p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="text-[10px] text-slate-500 leading-relaxed p-3 rounded-xl bg-slate-50 border border-slate-100">
                   Your design is autosaved to this browser. Export JSON to move it between devices, or re-import it from the Inventory tab.
                 </div>
               </div>
@@ -1438,7 +1448,7 @@ export default function App({
                       <div className="text-[10px] text-slate-500">Snapshot + room & asset report</div>
                     </div>
                   </div>
-                  <Download className="w-4 h-4 text-slate-400 group-hover:text-green-500" />
+                  <Download className="w-4 h-4 text-slate-500 group-hover:text-green-500" />
                 </button>
 
                 <button
@@ -1454,7 +1464,7 @@ export default function App({
                       <div className="text-[10px] text-slate-500">PNG snapshot of the 3D grid</div>
                     </div>
                   </div>
-                  <Download className="w-4 h-4 text-slate-400 group-hover:text-green-500" />
+                  <Download className="w-4 h-4 text-slate-500 group-hover:text-green-500" />
                 </button>
               </div>
             </div>
@@ -1464,7 +1474,7 @@ export default function App({
                 onClick={() => setShowShareModal(false)}
                 className="av-btn av-btn-secondary text-sm"
               >
-                Close Window
+                Close
               </button>
             </div>
           </div>
@@ -1472,7 +1482,7 @@ export default function App({
       )}
 
       {/* 3. Sleek Architectural Footer */}
-      <footer className="h-10 bg-white border-t border-slate-200 px-6 flex items-center justify-between text-[10px] text-slate-400 font-medium shrink-0">
+      <footer className="h-10 bg-white border-t border-slate-200 px-6 flex items-center justify-between text-[10px] text-slate-500 font-medium shrink-0">
         <div className="flex items-center gap-3">
           <span className="hidden md:inline">© {new Date().getFullYear()} ArchViz Pro</span>
           <button type="button" onClick={() => setLegalTab('terms')} className="hover:text-cyan-600 transition-colors">Terms</button>
